@@ -54,6 +54,10 @@ private:
   void finishSoilLogging();
   /** @brief Poll sensor connectivity for fault detection. */
   void checkSensorConnections();
+  /** @brief Non-blocking orientation alignment step. */
+  void checkOrientationStep();
+  /** @brief Poll limit switches at a fixed interval. */
+  void pollLimitSwitches();
 
   HardwareSerial &modbus_;
 
@@ -88,4 +92,14 @@ private:
   driverSD soilData_;
 
   bool leadScrewFullyExtended_ = false;
+  bool augerSpinActive_ = false;
+  bool orientationAligned_ = false;
+  bool upperSwitchPressed_ = false;
+  bool lowerSwitchPressed_ = false;
+  elapsedMillis preflightTimer_;
+  elapsedMillis preflightStateTimer_;
+  elapsedMillis inflightTimer_;
+  elapsedMillis augerSpinTimer_;
+  elapsedMillis orientationTimer_;
+  elapsedMillis switchPollTimer_;
 };

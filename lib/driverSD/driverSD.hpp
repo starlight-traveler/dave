@@ -1,5 +1,5 @@
+#include <Arduino.h>
 #include <SD.h>
-#include <string>
 #include <arm_math.h>
 #include <Adafruit_Sensor.h>
 #include <sh2_SensorValue.h>
@@ -9,8 +9,8 @@
 
 class driverSD {
     private:
-        const char* fileName;
-        float32_t dataBuffer [40][10];
+        String fileName;
+        float32_t dataBuffer[40][10];
         int numBufferCol;
         int dataBufferIndex = 0;
 

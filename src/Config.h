@@ -56,6 +56,9 @@ constexpr int32_t kAltitudeBelowThresholdCount = 5;
 /** @brief Maximum inflight time (ms) before forcing landed state. */
 constexpr uint32_t kInflightTimeoutMs = 180000;
 
+/** @brief Maximum preflight wait (ms) before forcing landed/drill sequence. */
+constexpr uint32_t kPreflightTimeoutMs = 21600000;
+
 /** @brief Maximum landed time (ms) before shutting down motors/logging. */
 constexpr uint32_t kLandedTimeoutMs = 900000;
 

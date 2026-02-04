@@ -32,6 +32,7 @@ void FlightController::begin() {
   }
 
   soil_.begin(kSoilSensorBaud, kSoilSensorSlaveId);
+  preflightStateTimer_ = 0;
 }
 
 void FlightController::update() {
@@ -54,6 +55,11 @@ void FlightController::update() {
 }
 
 void FlightController::updatePreflight() {
+  if (preflightTimer_ < 50) {
+    return;
+  }
+  preflightTimer_ = 0;
+
   sensors_event_t accel = getH3LIS331Accel(&lis_);
   float32_t accelSquared = accel.acceleration.x * accel.acceleration.x
                          + accel.acceleration.y * accel.acceleration.y
@@ -63,18 +69,34 @@ void FlightController::updatePreflight() {
     state_ = INFLIGHT;
     inflightStartTime_ = millis();
     previousAltitude_ = getAltitude(&bmp_);
+    preflightStateTimer_ = 0;
   }
 
-  delay(50);
+  if (preflightStateTimer_ >= kPreflightTimeoutMs) {
+    state_ = LANDED;
+    landedStartTime_ = millis();
+    orientationAligned_ = false;
+    orientationTimer_ = 0;
+    switchPollTimer_ = 0;
+  }
+
 }
 
 void FlightController::updateInflight() {
+  if (inflightTimer_ < 30) {
+    return;
+  }
+  inflightTimer_ = 0;
+
   const uint32_t timeDiffInFlight = millis() - inflightStartTime_;
+  sensors_event_t accel = getH3LIS331Accel(&lis_);
+  sh2_SensorValue_t bnoEvent = getBNO085Event(&bno_);
+  float32_t altitude = getAltitude(&bmp_);
 
   startFlightLoggingIfNeeded();
-  flightData_.addFlightData(getH3LIS331Accel(&lis_), getBNO085Event(&bno_), getAltitude(&bmp_), dataFile_);
+  flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
 
-  currentAltitude_ = getAltitude(&bmp_);
+  currentAltitude_ = altitude;
   if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
     altitudeBelowThresholdCount_++;
   } else {
@@ -84,22 +106,25 @@ void FlightController::updateInflight() {
   if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
     state_ = LANDED;
     landedStartTime_ = millis();
+    orientationAligned_ = false;
+    orientationTimer_ = 0;
+    switchPollTimer_ = 0;
     finishFlightLogging();
   }
 
   previousAltitude_ = currentAltitude_;
-  delay(30);
 }
 
 void FlightController::updateLanded() {
   startSoilLoggingIfNeeded();
-  checkOrientation();
+  checkOrientationStep();
+  pollLimitSwitches();
 
   if (topHits_ == 0) {
     leadScrewMotor_.moveMotorBackward(0.5f);
   }
 
-  if (digitalRead(kUpperLimitSwitchPin) == HIGH) {
+  if (upperSwitchPressed_) {
     topHits_++;
   }
 
@@ -108,22 +133,26 @@ void FlightController::updateLanded() {
     leadScrewMotor_.moveMotorForward(0.5f);
   }
 
-  if (digitalRead(kLowerLimitSwitchPin) == HIGH) {
+  if (lowerSwitchPressed_) {
     bottomHits_++;
   }
 
   if (bottomHits_ == 1 && topHits_ == 1) {
-    leadScrewMotor_.stopMotorWithCoast();
-    leadScrewFullyExtended_ = true;
-    delay(10000);
+    if (!augerSpinActive_) {
+      leadScrewMotor_.stopMotorWithCoast();
+      leadScrewFullyExtended_ = true;
+      augerSpinActive_ = true;
+      augerSpinTimer_ = 0;
+    }
   }
 
-  if (leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 1) {
+  if (leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 1 && augerSpinActive_ && augerSpinTimer_ >= 10000) {
+    augerSpinActive_ = false;
     leadScrewFullyExtended_ = false;
     leadScrewMotor_.moveMotorBackward(0.5f);
   }
 
-  if (digitalRead(kUpperLimitSwitchPin) == HIGH) {
+  if (upperSwitchPressed_) {
     leadScrewMotor_.stopMotorWithCoast();
     topHits_++;
   }
@@ -167,16 +196,28 @@ void FlightController::updateLanded() {
   state_ = LANDED;
 }
 
-void FlightController::checkOrientation() {
+void FlightController::checkOrientationStep() {
+  if (orientationAligned_) {
+    return;
+  }
+
   sh2_SensorValue_t event = getBNO085Event(&bno_);
 
-  while (event.un.gravity.z > -9.0f || event.un.gravity.z < -11.0f) {
-    if (event.un.gravity.x > 0) {
-      orientMotor_.moveMotorForward(1.0f);
-    } else {
-      orientMotor_.moveMotorBackward(1.0f);
-    }
-    event = getBNO085Event(&bno_);
+  if (event.un.gravity.z <= -9.0f && event.un.gravity.z >= -11.0f) {
+    orientMotor_.stopMotorWithCoast();
+    orientationAligned_ = true;
+    return;
+  }
+
+  if (event.un.gravity.x > 0) {
+    orientMotor_.moveMotorForward(1.0f);
+  } else {
+    orientMotor_.moveMotorBackward(1.0f);
+  }
+
+  if (orientationTimer_ >= 5000) {
+    orientMotor_.stopMotorWithCoast();
+    orientationAligned_ = true;
   }
 }
 
@@ -206,4 +247,13 @@ void FlightController::checkSensorConnections() {
   checkBNO085Connection(&bno_);
   checkBMP390Connection(&bmp_);
   checkH3LIS331Connection(&lis_);
+}
+
+void FlightController::pollLimitSwitches() {
+  if (switchPollTimer_ < 5) {
+    return;
+  }
+  switchPollTimer_ = 0;
+  upperSwitchPressed_ = (digitalReadFast(kUpperLimitSwitchPin) == HIGH);
+  lowerSwitchPressed_ = (digitalReadFast(kLowerLimitSwitchPin) == HIGH);
 }
