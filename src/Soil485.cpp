@@ -22,10 +22,10 @@ Soil485::Soil485(HardwareSerial &serial, uint8_t dePin, int8_t rePin)
 void Soil485::begin(uint32_t baud, uint8_t address) {
   address_ = address;
   pinMode(dePin_, OUTPUT);
-  digitalWrite(dePin_, LOW);
+  digitalWriteFast(dePin_, LOW);
   if (rePin_ >= 0) {
     pinMode(static_cast<uint8_t>(rePin_), OUTPUT);
-    digitalWrite(static_cast<uint8_t>(rePin_), LOW);
+    digitalWriteFast(static_cast<uint8_t>(rePin_), LOW);
   }
   serial_.begin(baud, SERIAL_8N1);
   serial_.setTimeout(timeoutMs_);
@@ -113,9 +113,9 @@ bool Soil485::readRegisters(uint16_t startReg, uint16_t count, uint16_t *values)
 }
 
 void Soil485::setTxMode(bool enable) {
-  digitalWrite(dePin_, enable ? HIGH : LOW);
+  digitalWriteFast(dePin_, enable ? HIGH : LOW);
   if (rePin_ >= 0) {
-    digitalWrite(static_cast<uint8_t>(rePin_), enable ? HIGH : LOW);
+    digitalWriteFast(static_cast<uint8_t>(rePin_), enable ? HIGH : LOW);
   }
 }
 

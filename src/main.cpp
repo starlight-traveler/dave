@@ -2,6 +2,9 @@
 
 #include "FlightController.h"
 
+
+// TODO: X is negative, Z is positive, equal but opposite magnitudes
+
 /** @brief Single global controller instance. */
 static FlightController controller(Serial1);
 

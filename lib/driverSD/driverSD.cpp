@@ -1,10 +1,30 @@
 #include "driverSD.hpp"
 
-//defining fileName here to be used in multiple functions
-const char* fileName;
-float32_t dataBuffer [40][10];
-int numBufferCol;
-int dataBufferIndex = 0;
+#include <cstring>
+
+namespace {
+void writeRow(File &dataFile, float32_t *row, int numCols) {
+    char line[192];
+    size_t pos = 0;
+
+    for (int col = 0; col < numCols; col++) {
+        char tmp[24];
+        dtostrf(row[col], 0, 6, tmp);
+        size_t len = strnlen(tmp, sizeof(tmp));
+        if (pos + len + 2 >= sizeof(line)) {
+            break;
+        }
+        memcpy(line + pos, tmp, len);
+        pos += len;
+        if (col + 1 < numCols) {
+            line[pos++] = ' ';
+        }
+    }
+
+    line[pos++] = '\n';
+    dataFile.write(reinterpret_cast<const uint8_t *>(line), pos);
+}
+}  // namespace
 
 driverSD::driverSD(const char* fileRoot, int numOfColumns){
     findCurrentFileName(fileRoot);
@@ -13,7 +33,7 @@ driverSD::driverSD(const char* fileRoot, int numOfColumns){
 
 //accessers
 const char* driverSD::getCurrentFileName(){
-    return fileName;
+    return fileName.c_str();
 }
 
 int driverSD::getCurrentIndex(){
@@ -38,7 +58,7 @@ void driverSD::findCurrentFileName(String fileRoot){
         fileRoot = fileRoot + String(fileNumber)+ ".txt";
     }
 
-    fileName = fileRoot.c_str();
+    fileName = fileRoot;
 }
 
 //this function will add landed data to the data buffer
@@ -55,11 +75,7 @@ void driverSD::findCurrentFileName(String fileRoot){
       if(dataBufferIndex == 39){
         //printing to SD card
         for(int i = 0; i<40; i++){
-          for(int j = 0; j<numBufferCol; j++){
-            dataFile.print(dataBuffer[i][j]);
-            dataFile.print(" ");
-          }
-          dataFile.println();
+          writeRow(dataFile, dataBuffer[i], numBufferCol);
         }
         //closing connection to sd card
         dataFile.close();
@@ -73,12 +89,7 @@ void driverSD::findCurrentFileName(String fileRoot){
   void driverSD::printFlightDataToFile(File dataFile){
         //printing to SD card
         for(int i = 0; i<=dataBufferIndex; i++){
-          for(int j = 0; j<numBufferCol; j++){
-            dataFile.print(dataBuffer[i][j]);
-            dataFile.print(" ");
-
-          }
-          dataFile.println();
+          writeRow(dataFile, dataBuffer[i], numBufferCol);
         }
         //closing file
         dataFile.close();
@@ -88,12 +99,7 @@ void driverSD::findCurrentFileName(String fileRoot){
   void driverSD::printSoilDataToFile(File dataFile){
         //printing to SD card
         for(int i = 0; i<=dataBufferIndex; i++){
-          for(int j = 0; j<numBufferCol; j++){
-            dataFile.print(dataBuffer[i][j]);
-            dataFile.print(" ");
-
-          }
-          dataFile.println();
+          writeRow(dataFile, dataBuffer[i], numBufferCol);
         }
         //closing file
         dataFile.close();
