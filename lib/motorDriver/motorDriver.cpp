@@ -19,21 +19,86 @@ motorDriver::motorDriver(int in1, int in2, int nSleep){
     }
 }
 
+motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault){
+    IN1 = in1;
+    IN2 = in2;
+    nSLEEP = nSleep;
+    nFault = nfault;
+
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(nSLEEP, OUTPUT);
+    pinMode(nFault, INPUT);
+
+    if (nSleep != -1) {
+        digitalWrite(nSLEEP, HIGH);
+    }
+}
+
+motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
+    IN1 = in1;
+    IN2 = in2;
+    nSLEEP = nSleep;
+    nFault = nfault;
+    DRVOFF = drvoff;
+
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(nSLEEP, OUTPUT);
+    pinMode(nFault, INPUT);
+    pinMode(DRVOFF, OUTPUT);
+
+    //in order to turn the motor with DRVOFF, the pin must be set to 0 in order for anything to run. If it is
+    // set to one, it nothing will work
+        digitalWrite(DRVOFF, LOW);
+
+
+    if (nSleep != -1) {
+        digitalWrite(nSLEEP, HIGH);
+    }
+}
+
 //this function will cause the motor to move forward
 void motorDriver::moveMotorForward(float dutyCycle) {
+    if(drvControlOn==0){
     analogWrite(IN1, int(255*dutyCycle)); //it seems like high is the same as 1 or true
     analogWrite(IN2, 0);   //low is the same as 0 or false
+    }
 }
 
 //this function will cause the motor to move backward
 void motorDriver::moveMotorBackward(float dutyCycle) {
+    if(drvControlOn==0){
     analogWrite(IN1, 0);
     analogWrite(IN2, int(255*dutyCycle));
+    }
 
 }
 
 //this function will stop the motor
 void motorDriver::stopMotorWithCoast() {
+    if(drvControlOn==0){
     analogWrite(IN1, 0);
     analogWrite(IN2, 0);
+    }
+}
+
+//this function will get the status of the nFault pin (if the motor has it), and will return true if the nFault pin has returned low 
+// voltage (indecating) something is wrong, and false if the pin returns high voltage, which indicates everything is alright
+bool motorDriver::nFaultPulledLow(){
+    if(drvControlOn==0){
+    if (digitalRead(nFault) == LOW)
+        return true;
+    else
+        return false;
+    }
+}
+
+//this method will check to see if the nFault pin is true (which means something is wrong with the motor), and if so
+//turning the DRVOFF pin on high so it stops working overall
+void motorDriver::turnOnDRVOFF(){
+    if(nFaultPulledLow()==true){
+        digitalWrite(DRVOFF, HIGH);
+        drvControlOn = 1;
+    }
 }
