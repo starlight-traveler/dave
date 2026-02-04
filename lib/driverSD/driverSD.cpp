@@ -44,7 +44,7 @@ void driverSD::findCurrentFileName(String fileRoot){
 //this function will add landed data to the data buffer
 //this method will take save the orientation of x, y, z to an array. After 40 sets have been collected, those sets are printed to file
 //on sd card and array rows are overwrittten with new data.
-  void addLandedData(sh2_SensorValue_t event, File dataFile){
+  void driverSD::addLandedData(sh2_SensorValue_t event, File dataFile){
     //adding data to array
       dataBuffer[dataBufferIndex][0] = (float32_t)millis();
       dataBuffer[dataBufferIndex][1] = event.un.rotationVector.i;
@@ -70,7 +70,7 @@ void driverSD::findCurrentFileName(String fileRoot){
 
 //this method will save the data from the flight data buffer array and add it the flight data file. Then, 
 //it will close the file
-  void printFlightDataToFile(File dataFile){
+  void driverSD::printFlightDataToFile(File dataFile){
         //printing to SD card
         for(int i = 0; i<=dataBufferIndex; i++){
           for(int j = 0; j<numBufferCol; j++){
@@ -85,7 +85,7 @@ void driverSD::findCurrentFileName(String fileRoot){
       }
 
 //this method will save all of the data in the soil data buffer to the soil data file, then close the file in the case the program shuts down before 40 indexes are reached
-  void printSoilDataToFile(File dataFile){
+  void driverSD::printSoilDataToFile(File dataFile){
         //printing to SD card
         for(int i = 0; i<=dataBufferIndex; i++){
           for(int j = 0; j<numBufferCol; j++){
@@ -101,7 +101,7 @@ void driverSD::findCurrentFileName(String fileRoot){
 
 //This method takes in the flight data buffer index, adds data to array, and returns the index+1 % 40 (will wrap around
 //to index zero once it hits 40). If the index is 39, it will print the entire array to the file, then close the file to save.
-  void addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t orienData , float32_t altitude, File dataFile){
+  void driverSD::addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t orienData , float32_t altitude, File dataFile){
     //adding data to array
       dataBuffer[dataBufferIndex][0] = (float32_t)millis();
       dataBuffer[dataBufferIndex][1] = linearAccelData.acceleration.x;
@@ -123,7 +123,7 @@ void driverSD::findCurrentFileName(String fileRoot){
   }
 
 //addding soil sensor data
-void addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File dataFile){
+void driverSD::addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File dataFile){
     //adding data to array
       dataBuffer[dataBufferIndex][0] = (float32_t)millis();
       dataBuffer[dataBufferIndex][1] = nitrogenPercentage;
