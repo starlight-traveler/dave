@@ -29,10 +29,11 @@ constexpr int32_t kOrientMotorIn1 = 27;
 constexpr int32_t kOrientMotorIn2 = 26;
 constexpr int32_t kOrientMotorSleep = 25;
 
-/** @brief Motor driver pins for the auger motor. */
-constexpr int32_t kAugerMotorIn1 = 31;
-constexpr int32_t kAugerMotorIn2 = 30;
-constexpr int32_t kAugerMotorSleep = 29;
+// /** @brief Motor driver pins for the auger motor. */
+// constexpr int32_t kAugerMotorIn1 = 31;
+constexpr int32_t gpioAuger = 30;
+// constexpr int32_t kAugerMotorIn2 = 30;
+// constexpr int32_t kAugerMotorSleep = 29;
 
 /** @brief Motor driver pins for the lead screw motor. */
 constexpr int32_t kLeadScrewMotorIn1 = 11;

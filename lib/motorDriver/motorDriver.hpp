@@ -14,11 +14,14 @@ class motorDriver {
 
     public:
         //constructor
+        motorDriver(int gpio);
         motorDriver(int in1, int in2, int nSleep);
         motorDriver(int in1, int in2, int nSleep, int nFault);
         motorDriver(int in1, int in2, int nSleep, int nFault, int DRVOFF);
         
         //other functions
+        void moveMosfet();
+        void stopMosfet();
         void moveMotorForward(float dutyCycle);
         void moveMotorBackward(float dutyCycle);
         void stopMotorWithCoast();

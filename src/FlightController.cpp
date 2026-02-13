@@ -9,7 +9,7 @@
 FlightController::FlightController(HardwareSerial &modbus)
     : modbus_(modbus),
       orientMotor_(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep),
-      augerMotor_(kAugerMotorIn1, kAugerMotorIn2, kAugerMotorSleep),
+      augerMotor_(gpioAuger),
       leadScrewMotor_(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep),
       waterMotor_(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep),
       soil_(modbus_, kRs485DirPin),
@@ -136,7 +136,7 @@ void FlightController::updateLanded() {
   }
 
   if (bottomHits_ == 0 && topHits_ == 1) {
-    augerMotor_.moveMotorForward(1.0f);
+    augerMotor_.moveMosfet();
     leadScrewMotor_.moveMotorForward(0.5f);
   }
 
@@ -187,7 +187,7 @@ void FlightController::updateLanded() {
   soilData_.addSoilSensorData(nitrogenMgKg_, pH_, electricalConductivity_, dataFile_);
 
   if (millis() - landedStartTime_ >= kLandedTimeoutMs) {
-    augerMotor_.stopMotorWithCoast();
+    augerMotor_.stopMosfet();
     leadScrewMotor_.stopMotorWithCoast();
     waterMotor_.stopMotorWithCoast();
     orientMotor_.stopMotorWithCoast();

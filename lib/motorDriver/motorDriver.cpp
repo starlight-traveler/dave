@@ -3,7 +3,12 @@
 //Here are the datasheets for all of the motor drivers being used:
 //https://www.ti.com/lit/ds/symlink/drv8874.pdf?HQS=dis-dk-null-digikeymode-dsf-pf-null-wwe&ts=1768564255162&ref_url=https%253A%252F%252Fwww.ti.com%252Fgeneral%252Fdocs%252Fsuppproductinfo.tsp%253FdistId%253D10%2526gotoUrl%253Dhttps%253A%252F%252Fwww.ti.com%252Flit%252Fgpn%252Fdrv8874
 //https://www.ti.com/lit/ds/symlink/drv8244-q1.pdf?ts=1701345632184
-//https://www.ti.com/lit/ds/symlink/drv8212p.pdf
+//https://www.ti.com/lit/ds/symlink/drv8212p.pdfint
+
+motorDriver::motorDriver(int gpio){
+    IN1 = gpio;
+    pinMode(IN1, INPUT);
+}
 
 motorDriver::motorDriver(int in1, int in2, int nSleep){
     IN1 = in1;
@@ -56,6 +61,14 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
     if (nSleep != -1) {
         digitalWrite(nSLEEP, HIGH);
     }
+}
+
+void motorDriver::moveMosfet(){
+    digitalWrite(IN1, HIGH);
+}
+
+void motorDriver::stopMosfet(){
+    digitalWrite(IN1, LOW);
 }
 
 //this function will cause the motor to move forward
