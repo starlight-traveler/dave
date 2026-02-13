@@ -19,9 +19,9 @@ FlightController::FlightController(HardwareSerial &modbus)
 void FlightController::begin() {
   Serial.begin(9600);
 
-  setupBMP(&bmp_);
+  //setupBMP(&bmp_);
   setupBNO085(&bno_);
-  setupH3LIS331(&lis_);
+  //setupH3LIS331(&lis_);
 
   pinMode(kUpperLimitSwitchPin, INPUT);
   pinMode(kLowerLimitSwitchPin, INPUT);
@@ -60,15 +60,20 @@ void FlightController::updatePreflight() {
   }
   preflightTimer_ = 0;
 
-  sensors_event_t accel = getH3LIS331Accel(&lis_);
-  float32_t accelSquared = accel.acceleration.x * accel.acceleration.x
-                         + accel.acceleration.y * accel.acceleration.y
-                         + accel.acceleration.z * accel.acceleration.z;
+  //sensors_event_t accel = getH3LIS331Accel(&lis_);
+  // float32_t accelSquared = accel.acceleration.x * accel.acceleration.x
+  //                        + accel.acceleration.y * accel.acceleration.y
+  //                        + accel.acceleration.z * accel.acceleration.z;
+
+  sh2_SensorValue_t event = getBNO085Event(&bno_);
+
+  float32_t accelSquared = event.un.accelerometer.x*event.un.accelerometer.x + event.un.accelerometer.y*event.un.accelerometer.y + 
+  event.un.accelerometer.z*event.un.accelerometer.z;
 
   if (accelSquared > kAccelThresholdSquared) {
     state_ = INFLIGHT;
     inflightStartTime_ = millis();
-    previousAltitude_ = getAltitude(&bmp_);
+    //previousAltitude_ = getAltitude(&bmp_);
     preflightStateTimer_ = 0;
   }
 
@@ -89,21 +94,23 @@ void FlightController::updateInflight() {
   inflightTimer_ = 0;
 
   const uint32_t timeDiffInFlight = millis() - inflightStartTime_;
-  sensors_event_t accel = getH3LIS331Accel(&lis_);
+  //sensors_event_t accel = getH3LIS331Accel(&lis_);
   sh2_SensorValue_t bnoEvent = getBNO085Event(&bno_);
-  float32_t altitude = getAltitude(&bmp_);
+  //float32_t altitude = getAltitude(&bmp_);
 
   startFlightLoggingIfNeeded();
-  flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
+  //flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
+  flightData_.addFlightData(bnoEvent, dataFile_);
 
-  currentAltitude_ = altitude;
-  if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
-    altitudeBelowThresholdCount_++;
-  } else {
-    altitudeBelowThresholdCount_ = 0;
-  }
+  // currentAltitude_ = altitude;
+  // if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
+  //   altitudeBelowThresholdCount_++;
+  // } else {
+  //   altitudeBelowThresholdCount_ = 0;
+  // }
 
-  if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
+  // if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
+  if (timeDiffInFlight > kInflightTimeoutMs) {
     state_ = LANDED;
     landedStartTime_ = millis();
     orientationAligned_ = false;
@@ -245,8 +252,8 @@ void FlightController::finishSoilLogging() {
 
 void FlightController::checkSensorConnections() {
   checkBNO085Connection(&bno_);
-  checkBMP390Connection(&bmp_);
-  checkH3LIS331Connection(&lis_);
+  //checkBMP390Connection(&bmp_);
+  //checkH3LIS331Connection(&lis_);
 }
 
 void FlightController::pollLimitSwitches() {

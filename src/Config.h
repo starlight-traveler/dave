@@ -45,7 +45,8 @@ constexpr int32_t kWaterMotorIn2 = 10;
 constexpr int32_t kWaterMotorSleep = -1;
 
 /** @brief Squared acceleration threshold (m/s^2)^2 to enter flight state (~4g). */
-constexpr float32_t kAccelThresholdSquared = 1536.64f;
+// constexpr float32_t kAccelThresholdSquared = 1536.64f;
+constexpr float32_t kAccelThresholdSquared = 864.36;
 
 /** @brief Minimum change in altitude (m) to consider still changing during flight. */
 constexpr float32_t kMinChangeInAltitude = 0.3f;

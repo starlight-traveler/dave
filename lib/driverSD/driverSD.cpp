@@ -105,18 +105,37 @@ void driverSD::findCurrentFileName(String fileRoot){
         dataFile.close();
       }
 
-//This method takes in the flight data buffer index, adds data to array, and returns the index+1 % 40 (will wrap around
+// //This method takes in the flight data buffer index, adds data to array, and returns the index+1 % 40 (will wrap around
+// //to index zero once it hits 40). If the index is 39, it will print the entire array to the file, then close the file to save.
+//   void driverSD::addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t orienData , float32_t altitude, File dataFile){
+//     //adding data to array
+//       dataBuffer[dataBufferIndex][0] = (float32_t)millis();
+//       dataBuffer[dataBufferIndex][1] = linearAccelData.acceleration.x;
+//       dataBuffer[dataBufferIndex][2] = linearAccelData.acceleration.y;
+//       dataBuffer[dataBufferIndex][3] = linearAccelData.acceleration.z;
+//       dataBuffer[dataBufferIndex][4] = orienData.un.rotationVector.i;
+//       dataBuffer[dataBufferIndex][5] = orienData.un.rotationVector.j;
+//       dataBuffer[dataBufferIndex][6] = orienData.un.rotationVector.k;
+//       dataBuffer[dataBufferIndex][7] = altitude;
+
+//     //printing data to file and closing connection if index is 39
+//       if(dataBufferIndex==39){
+//         printFlightDataToFile(dataFile);
+//       }
+    
+//     //increasing the index by 1, wrapping if necesarry
+//       dataBufferIndex = (dataBufferIndex+1) % 40;
+
+//   }
+
+  //This method takes in the flight data buffer index, adds data to array, and returns the index+1 % 40 (will wrap around
 //to index zero once it hits 40). If the index is 39, it will print the entire array to the file, then close the file to save.
-  void driverSD::addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t orienData , float32_t altitude, File dataFile){
+  void driverSD::addFlightData( sh2_SensorValue_t orienData , File dataFile){
     //adding data to array
       dataBuffer[dataBufferIndex][0] = (float32_t)millis();
-      dataBuffer[dataBufferIndex][1] = linearAccelData.acceleration.x;
-      dataBuffer[dataBufferIndex][2] = linearAccelData.acceleration.y;
-      dataBuffer[dataBufferIndex][3] = linearAccelData.acceleration.z;
       dataBuffer[dataBufferIndex][4] = orienData.un.rotationVector.i;
       dataBuffer[dataBufferIndex][5] = orienData.un.rotationVector.j;
       dataBuffer[dataBufferIndex][6] = orienData.un.rotationVector.k;
-      dataBuffer[dataBufferIndex][7] = altitude;
 
     //printing data to file and closing connection if index is 39
       if(dataBufferIndex==39){

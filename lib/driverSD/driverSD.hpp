@@ -24,7 +24,8 @@ class driverSD {
         int getCurrentIndex();
         void increaseCurrentIndexBy(int increment);
         void addLandedData(sh2_SensorValue_t event, File dataFile);
-        void addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t gameRotationVector, float32_t altitude, File dataFile);
+        void addFlightData(sh2_SensorValue_t gameRotationVector, File dataFile);
+        //void addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t gameRotationVector, float32_t altitude, File dataFile);
         void addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File dataFile);
         //need a void addSoilData function here too
         void printFlightDataToFile(File dataFile);
