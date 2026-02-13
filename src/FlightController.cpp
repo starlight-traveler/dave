@@ -17,7 +17,11 @@ FlightController::FlightController(HardwareSerial &modbus)
       soilData_(kSoilDataRoot, 4) {}
 
 void FlightController::begin() {
-  Serial.begin(9600);
+  
+  //setting pin 30 to low so it doesnt float
+    augerMotor_.stopMosfet();
+
+    Serial.begin(9600);
 
   //setupBMP(&bmp_);
   setupBNO085(&bno_);
