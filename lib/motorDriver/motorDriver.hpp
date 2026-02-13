@@ -10,7 +10,7 @@ class motorDriver {
         int nSLEEP;
         int nFault;
         int DRVOFF;
-        int drvControlOn = 0;
+        bool drvControlOn = false;
 
     public:
         //constructor

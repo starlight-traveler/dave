@@ -10,9 +10,9 @@ motorDriver::motorDriver(int in1, int in2, int nSleep){
     IN2 = in2;
     nSLEEP = nSleep;
 
-    pinMode(IN1, OUTPUT);
-    pinMode(IN2, OUTPUT);
-    pinMode(nSLEEP, OUTPUT);
+    pinMode(IN1, INPUT);
+    pinMode(IN2, INPUT);
+    pinMode(nSLEEP, INPUT);
 
     if (nSleep != -1) {
         digitalWrite(nSLEEP, HIGH);
@@ -25,9 +25,9 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault){
     nSLEEP = nSleep;
     nFault = nfault;
 
-    pinMode(IN1, OUTPUT);
-    pinMode(IN2, OUTPUT);
-    pinMode(nSLEEP, OUTPUT);
+    pinMode(IN1, INPUT);
+    pinMode(IN2, INPUT);
+    pinMode(nSLEEP, INPUT);
     pinMode(nFault, INPUT);
 
     if (nSleep != -1) {
@@ -42,11 +42,11 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
     nFault = nfault;
     DRVOFF = drvoff;
 
-    pinMode(IN1, OUTPUT);
-    pinMode(IN2, OUTPUT);
-    pinMode(nSLEEP, OUTPUT);
+    pinMode(IN1, INPUT);
+    pinMode(IN2, INPUT);
+    pinMode(nSLEEP, INPUT);
     pinMode(nFault, INPUT);
-    pinMode(DRVOFF, OUTPUT);
+    pinMode(DRVOFF, INPUT);
 
     //in order to turn the motor with DRVOFF, the pin must be set to 0 in order for anything to run. If it is
     // set to one, it nothing will work
@@ -77,7 +77,7 @@ void motorDriver::moveMotorBackward(float dutyCycle) {
 
 //this function will stop the motor
 void motorDriver::stopMotorWithCoast() {
-    if(drvControlOn==0){
+    if(drvControlOn==false){
     analogWrite(IN1, 0);
     analogWrite(IN2, 0);
     }
@@ -86,7 +86,7 @@ void motorDriver::stopMotorWithCoast() {
 //this function will get the status of the nFault pin (if the motor has it), and will return true if the nFault pin has returned low 
 // voltage (indecating) something is wrong, and false if the pin returns high voltage, which indicates everything is alright
 bool motorDriver::nFaultPulledLow(){
-    if(drvControlOn==0){
+    if(drvControlOn==false){
     if (digitalRead(nFault) == LOW)
         return true;
     else
@@ -99,6 +99,6 @@ bool motorDriver::nFaultPulledLow(){
 void motorDriver::turnOnDRVOFF(){
     if(nFaultPulledLow()==true){
         digitalWrite(DRVOFF, HIGH);
-        drvControlOn = 1;
+        drvControlOn = true;
     }
 }
