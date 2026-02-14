@@ -28,6 +28,7 @@ constexpr int32_t kLowerLimitSwitchPin = 3;
 constexpr int32_t kOrientMotorIn1 = 27;
 constexpr int32_t kOrientMotorIn2 = 26;
 constexpr int32_t kOrientMotorSleep = 25;
+constexpr int32_t kOrientMotorNFault = 24;
 
 // /** @brief Motor driver pins for the auger motor. */
 // constexpr int32_t kAugerMotorIn1 = 31;

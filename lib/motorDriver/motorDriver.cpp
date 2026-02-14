@@ -7,7 +7,7 @@
 
 motorDriver::motorDriver(int gpio){
     IN1 = gpio;
-    pinMode(IN1, INPUT);
+    pinMode(IN1, OUTPUT);
 }
 
 motorDriver::motorDriver(int in1, int in2, int nSleep){
@@ -15,9 +15,9 @@ motorDriver::motorDriver(int in1, int in2, int nSleep){
     IN2 = in2;
     nSLEEP = nSleep;
 
-    pinMode(IN1, INPUT);
-    pinMode(IN2, INPUT);
-    pinMode(nSLEEP, INPUT);
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(nSLEEP, OUTPUT);
 
     if (nSleep != -1) {
         digitalWrite(nSLEEP, HIGH);
@@ -30,9 +30,9 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault){
     nSLEEP = nSleep;
     nFault = nfault;
 
-    pinMode(IN1, INPUT);
-    pinMode(IN2, INPUT);
-    pinMode(nSLEEP, INPUT);
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(nSLEEP, OUTPUT);
     pinMode(nFault, INPUT);
 
     if (nSleep != -1) {
@@ -47,11 +47,11 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
     nFault = nfault;
     DRVOFF = drvoff;
 
-    pinMode(IN1, INPUT);
-    pinMode(IN2, INPUT);
-    pinMode(nSLEEP, INPUT);
+    pinMode(IN1, OUTPUT);
+    pinMode(IN2, OUTPUT);
+    pinMode(nSLEEP, OUTPUT);
     pinMode(nFault, INPUT);
-    pinMode(DRVOFF, INPUT);
+    pinMode(DRVOFF, OUTPUT);
 
     //in order to turn the motor with DRVOFF, the pin must be set to 0 in order for anything to run. If it is
     // set to one, it nothing will work
@@ -73,7 +73,7 @@ void motorDriver::stopMosfet(){
 
 //this function will cause the motor to move forward
 void motorDriver::moveMotorForward(float dutyCycle) {
-    if(drvControlOn==0){
+    if(drvControlOn==false){
     analogWrite(IN1, int(255*dutyCycle)); //it seems like high is the same as 1 or true
     analogWrite(IN2, 0);   //low is the same as 0 or false
     }
@@ -81,7 +81,7 @@ void motorDriver::moveMotorForward(float dutyCycle) {
 
 //this function will cause the motor to move backward
 void motorDriver::moveMotorBackward(float dutyCycle) {
-    if(drvControlOn==0){
+    if(drvControlOn==false){
     analogWrite(IN1, 0);
     analogWrite(IN2, int(255*dutyCycle));
     }

@@ -8,7 +8,7 @@
 /** @brief Construct controller with configured hardware. */
 FlightController::FlightController(HardwareSerial &modbus)
     : modbus_(modbus),
-      orientMotor_(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep),
+      orientMotor_(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep, kOrientMotorNFault),
       augerMotor_(gpioAuger),
       leadScrewMotor_(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep),
       waterMotor_(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep),
@@ -17,7 +17,7 @@ FlightController::FlightController(HardwareSerial &modbus)
       soilData_(kSoilDataRoot, 4) {}
 
 void FlightController::begin() {
-  
+
   //setting pin 30 to low so it doesnt float
     augerMotor_.stopMosfet();
 
@@ -27,8 +27,8 @@ void FlightController::begin() {
   setupBNO085(&bno_);
   //setupH3LIS331(&lis_);
 
-  pinMode(kUpperLimitSwitchPin, INPUT);
-  pinMode(kLowerLimitSwitchPin, INPUT);
+  pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
+  pinMode(kLowerLimitSwitchPin, INPUT_PULLUP);
 
   if (!SD.begin(BUILTIN_SDCARD)) {
     while (1) {
@@ -265,6 +265,6 @@ void FlightController::pollLimitSwitches() {
     return;
   }
   switchPollTimer_ = 0;
-  upperSwitchPressed_ = (digitalReadFast(kUpperLimitSwitchPin) == HIGH);
-  lowerSwitchPressed_ = (digitalReadFast(kLowerLimitSwitchPin) == HIGH);
+  upperSwitchPressed_ = (digitalReadFast(kUpperLimitSwitchPin) == LOW);
+  lowerSwitchPressed_ = (digitalReadFast(kLowerLimitSwitchPin) == LOW);
 }
