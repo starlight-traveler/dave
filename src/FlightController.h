@@ -58,6 +58,8 @@ private:
   void checkOrientationStep();
   /** @brief Poll limit switches at a fixed interval. */
   void pollLimitSwitches();
+  /** @brief Human-readable state name for serial logs. */
+  const char *stateName(FlightState state) const;
 
   HardwareSerial &modbus_;
 
@@ -74,6 +76,8 @@ private:
   File dataFile_;
 
   FlightState state_ = PREFLIGHT;
+  FlightState lastLoggedState_ = PREFLIGHT;
+  bool hasLoggedInitialState_ = false;
   uint32_t inflightStartTime_ = 0;
   uint32_t landedStartTime_ = 0;
 
