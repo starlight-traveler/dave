@@ -84,15 +84,15 @@ void driverSD::findCurrentFileName(String fileRoot){
 
 // //This method takes in the flight data buffer index, adds data to array, and returns the index+1 % 40 (will wrap around
 // //to index zero once it hits 40). If the index is 39, it will print the entire array to the file, then close the file to save.
-  void driverSD::addFlightData(sensors_event_t linearAccelData, sensors_event_t orientData , float32_t altitude, File dataFile){
+  void driverSD::addFlightData(sensors_event_t accel, sensors_event_t bnoEvent , float32_t altitude, File dataFile){
     //adding data to array
       dataBuffer[dataBufferIndex][0] = (float32_t)millis();
-      dataBuffer[dataBufferIndex][1] = linearAccelData.acceleration.x;
-      dataBuffer[dataBufferIndex][2] = linearAccelData.acceleration.y;
-      dataBuffer[dataBufferIndex][3] = linearAccelData.acceleration.z;
-      dataBuffer[dataBufferIndex][4] = orientData.orientation.x;
-      dataBuffer[dataBufferIndex][5] = orientData.orientation.y;
-      dataBuffer[dataBufferIndex][6] = orientData.orientation.z;
+      dataBuffer[dataBufferIndex][1] = accel.acceleration.x;
+      dataBuffer[dataBufferIndex][2] = accel.acceleration.y;
+      dataBuffer[dataBufferIndex][3] = accel.acceleration.z;
+      dataBuffer[dataBufferIndex][4] = bnoEvent.orientation.x;
+      dataBuffer[dataBufferIndex][5] = bnoEvent.orientation.y;
+      dataBuffer[dataBufferIndex][6] = bnoEvent.orientation.z;
       dataBuffer[dataBufferIndex][7] = altitude;
 
     //printing data to file and closing connection if index is 39

@@ -5,7 +5,7 @@
 #include <arm_math.h>
 #include "BMP390.hpp"
 #include "BNO055.hpp"
-#include "H3LIS331.hpp"
+#include "ICM20649.hpp"
 #include "Soil485.h"
 #include "driverSD.hpp"
 #include "motorDriver.hpp"
@@ -69,7 +69,7 @@ private:
 
   Adafruit_BMP3XX bmp_;
   Adafruit_BNO055 bno_ =  Adafruit_BNO055(55, 0x28);
-  Adafruit_H3LIS331 lis_;
+  Adafruit_ICM20649 icm;
   Soil485 soil_;
 
   File dataFile_;
