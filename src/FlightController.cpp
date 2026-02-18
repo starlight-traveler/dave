@@ -354,10 +354,11 @@ void FlightController::finishSoilLogging() {
 
 void FlightController::checkSensorConnections() {
   static elapsedMillis sensorLogTimer;
-  if (sensorLogTimer >= 2000) {
-    sensorLogTimer = 0;
-    LOG_PRINTLN(F("[FC] checkSensorConnections(): polling BNO health"));
+  if (sensorLogTimer < 2000) {
+    return;
   }
+  sensorLogTimer = 0;
+  LOG_PRINTLN(F("[FC] checkSensorConnections(): polling BNO health"));
   checkBNO085Connection(&bno_);
   //checkBMP390Connection(&bmp_);
   //checkH3LIS331Connection(&lis_);

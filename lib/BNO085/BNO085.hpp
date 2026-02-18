@@ -3,9 +3,6 @@
 
 //If MATHUTILS_H is not defined, define it (start of header guard)
 #ifndef BNO085_H
-
-// Define MATHUTILS_H to prevent multiple inclusions
-#define MATHUTILS_H
 #define BNO085_H
 
 //functions to setup and get data from the bno085
