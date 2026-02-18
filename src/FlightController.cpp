@@ -1,15 +1,19 @@
 #include "FlightController.h"
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-#include <math.h>
 #include "Config.h"
 #include "DebugLog.h"
 
 namespace {
-constexpr float32_t kMaxReasonableAccelMs2 = 200.0f;
+float32_t absScalarF32(float32_t value) {
+  float32_t src[1] = {value};
+  float32_t dst[1] = {0.0f};
+  arm_abs_f32(src, dst, 1);
+  return dst[0];
+}
 
 bool isFiniteAndReasonable(float32_t value) {
-  return isfinite(value) && fabsf(value) <= kMaxReasonableAccelMs2;
+  return __builtin_isfinite(value) && absScalarF32(value) <= kAccelSanityMaxAbsMs2;
 }
 
 bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
@@ -17,7 +21,10 @@ bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
 }
 
 float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
-  return x * x + y * y + z * z;
+  float32_t vec[3] = {x, y, z};
+  float32_t magnitudeSquared = 0.0f;
+  arm_dot_prod_f32(vec, vec, 3, &magnitudeSquared);
+  return magnitudeSquared;
 }
 }
 
@@ -172,7 +179,7 @@ void FlightController::updateInflight() {
   }
 
   currentAltitude_ = altitude;
-  if (fabsf(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
+  if (absScalarF32(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
     altitudeBelowThresholdCount_++;
   } else {
     altitudeBelowThresholdCount_ = 0;

@@ -33,6 +33,7 @@ constexpr int32_t kWaterMotorSleep = -1;
 
 // -------------------- Flight Controller Thresholds --------------------
 constexpr float32_t kAccelThresholdSquared = 864.36f;
+constexpr float32_t kAccelSanityMaxAbsMs2 = 1500.0f;
 constexpr float32_t kMinChangeInAltitude = 0.3f;
 constexpr int32_t kAltitudeBelowThresholdCount = 5;
 

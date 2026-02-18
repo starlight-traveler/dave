@@ -53,7 +53,7 @@ void setupBNO055(Adafruit_BNO055 *bno){
     }
 
     //connecting to the bno three times in a row as apart of the startup process, im assuming to get rid of faulty early values
-    for (uint8_t attempt = 0; attempt < kBnoStartupInitAttempts; attempt) {
+    for (uint8_t attempt = 0; attempt < kBnoStartupInitAttempts; ++attempt) {
         if (reconnectBNO055(bno)) { // it it connects
             bno->setExtCrystalUse(true);
             lastEventMs = millis(); //setting the last event found to current
@@ -78,5 +78,4 @@ sensors_event_t getBNO055Event(Adafruit_BNO055 *bno){
   return event;
 
 }
-
 
