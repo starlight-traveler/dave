@@ -8,7 +8,7 @@ motorDriver augerMotor;
 }
 
 void setup() {
-  LOG_BEGIN(9600);
+  LOG_BEGIN(kSerialBaud);
   LOG_PRINTLN(F("[TEST_AUGER] setup(): creating auger MOSFET driver"));
   LOG_PRINT(F("[TEST_AUGER] gpio="));
   LOG_PRINTLN(gpioAuger);
@@ -18,10 +18,10 @@ void setup() {
 
 void loop() {
   LOG_PRINTLN(F("[TEST_AUGER] loop(): waiting 5s before ON"));
-  delay(5000);
+  delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_AUGER] loop(): moveMosfet() -> ON"));
   augerMotor.moveMosfet();
-  delay(5000);
+  delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_AUGER] loop(): stopMosfet() -> OFF"));
   augerMotor.stopMosfet();
 }

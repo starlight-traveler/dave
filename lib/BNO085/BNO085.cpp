@@ -1,19 +1,15 @@
 #include "BNO085.hpp"
 
 #include <Arduino.h>
+#include "Config.h"
 
 namespace {
-constexpr uint32_t kReportIntervalUs = 10000;       // 100 Hz
-constexpr uint32_t kNoDataReconnectMs = 1500;       // No samples before considering reconnect
-constexpr uint32_t kReconnectBackoffMs = 2000;      // Avoid rapid begin_I2C loops
-constexpr uint8_t kStartupInitAttempts = 3;
-
 uint32_t gLastEventMs = 0;
 uint32_t gLastReconnectAttemptMs = 0;
 
 bool configureReports(Adafruit_BNO08x *bno) {
-  const bool accelEnabled = bno->enableReport(SH2_ACCELEROMETER, kReportIntervalUs);
-  const bool gravityEnabled = bno->enableReport(SH2_GRAVITY, kReportIntervalUs);
+  const bool accelEnabled = bno->enableReport(SH2_ACCELEROMETER, kBnoReportIntervalUs);
+  const bool gravityEnabled = bno->enableReport(SH2_GRAVITY, kBnoReportIntervalUs);
   return accelEnabled && gravityEnabled;
 }
 
@@ -42,8 +38,8 @@ void checkBNO085Connection(Adafruit_BNO08x *bno) {
     gLastEventMs = now;
   }
 
-  const bool dataTimedOut = (now - gLastEventMs) >= kNoDataReconnectMs;
-  const bool backoffElapsed = (now - gLastReconnectAttemptMs) >= kReconnectBackoffMs;
+  const bool dataTimedOut = (now - gLastEventMs) >= kBnoNoDataReconnectMs;
+  const bool backoffElapsed = (now - gLastReconnectAttemptMs) >= kBnoReconnectBackoffMs;
   if (!dataTimedOut || !backoffElapsed) {
     return;
   }
@@ -60,13 +56,13 @@ void setupBNO085(Adafruit_BNO08x *bno) {
     return;
   }
 
-  for (uint8_t attempt = 0; attempt < kStartupInitAttempts; ++attempt) {
+  for (uint8_t attempt = 0; attempt < kBnoStartupInitAttempts; ++attempt) {
     if (reconnectAndConfigure(bno)) {
       gLastEventMs = millis();
       gLastReconnectAttemptMs = 0;
       return;
     }
-    delay(50);
+    delay(kBnoStartupRetryDelayMs);
   }
 }
 

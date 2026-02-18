@@ -13,7 +13,7 @@ elapsedMillis switchPollTimer;
 motorDriver leadScrewMotor;
 
 void pollLimitSwitches() {
-  if (switchPollTimer < 5) {
+  if (switchPollTimer < kSwitchPollPeriodMs) {
     return;
   }
   switchPollTimer = 0;
@@ -34,7 +34,7 @@ void pollLimitSwitches() {
 }
 
 void setup() {
-  LOG_BEGIN(9600);
+  LOG_BEGIN(kSerialBaud);
   LOG_PRINTLN(F("[TEST_LEAD] setup(): creating lead screw motor driver"));
   leadScrewMotor = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
 
@@ -50,7 +50,7 @@ void loop() {
 
   if (topHits == 0) {
     LOG_PRINTLN(F("[TEST_LEAD] action: searching top switch (move backward)"));
-    leadScrewMotor.moveMotorBackward(0.5f);
+    leadScrewMotor.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
   if (upperSwitchPressed) {
@@ -61,7 +61,7 @@ void loop() {
 
   if (bottomHits == 0 && topHits == 1) {
     LOG_PRINTLN(F("[TEST_LEAD] action: moving down toward lower switch"));
-    leadScrewMotor.moveMotorForward(0.5f);
+    leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
   }
 
   if (lowerSwitchPressed) {
@@ -79,7 +79,7 @@ void loop() {
   if (leadScrewFullyExtended && bottomHits == 1 && topHits == 1) {
     LOG_PRINTLN(F("[TEST_LEAD] action: retracting after extension"));
     leadScrewFullyExtended = false;
-    leadScrewMotor.moveMotorBackward(0.5f);
+    leadScrewMotor.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
   if (upperSwitchPressed) {
@@ -95,7 +95,7 @@ void loop() {
   }
 
   static elapsedMillis heartbeat;
-  if (heartbeat >= 1000) {
+  if (heartbeat >= kMainHeartbeatMs) {
     heartbeat = 0;
     LOG_PRINT(F("[TEST_LEAD] heartbeat top/bottom="));
     LOG_PRINT(topHits);

@@ -8,7 +8,7 @@ motorDriver orientMotor;
 }
 
 void setup() {
-  LOG_BEGIN(9600);
+  LOG_BEGIN(kSerialBaud);
   LOG_PRINTLN(F("[TEST_ORIENT_MOTOR] setup(): creating orientation motor driver"));
   LOG_PRINT(F("[TEST_ORIENT_MOTOR] pins in1/in2/slp="));
   LOG_PRINT(kOrientMotorIn1);
@@ -22,10 +22,10 @@ void setup() {
 
 void loop() {
   LOG_PRINTLN(F("[TEST_ORIENT_MOTOR] loop(): waiting 5s before forward command"));
-  delay(5000);
+  delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_ORIENT_MOTOR] loop(): moveMotorForward(1.0)"));
-  orientMotor.moveMotorForward(1.0f);
-  delay(5000);
+  orientMotor.moveMotorForward(kOrientationDutyCycle);
+  delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_ORIENT_MOTOR] loop(): stopMotorWithCoast()"));
   orientMotor.stopMotorWithCoast();
 }

@@ -8,7 +8,7 @@ motorDriver waterMotor;
 }
 
 void setup() {
-  LOG_BEGIN(9600);
+  LOG_BEGIN(kSerialBaud);
   LOG_PRINTLN(F("[TEST_WATER] setup(): creating water motor driver"));
   LOG_PRINT(F("[TEST_WATER] pins in1/in2/slp="));
   LOG_PRINT(kWaterMotorIn1);
@@ -22,10 +22,10 @@ void setup() {
 
 void loop() {
   LOG_PRINTLN(F("[TEST_WATER] loop(): waiting 5s before motor ON"));
-  delay(5000);
+  delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_WATER] loop(): moveMotorForward(1.0)"));
-  waterMotor.moveMotorForward(1.0f);
-  delay(5000);
+  waterMotor.moveMotorForward(kWaterDutyCycle);
+  delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_WATER] loop(): stopMotorWithCoast()"));
   waterMotor.stopMotorWithCoast();
 }

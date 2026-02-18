@@ -14,11 +14,11 @@ FlightController::FlightController(HardwareSerial &modbus)
       leadScrewMotor_(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep),
       waterMotor_(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep),
       soil_(modbus_, kRs485DirPin),
-      flightData_(kFlightDataRoot, 8),
-      soilData_(kSoilDataRoot, 4) {}
+      flightData_(kFlightDataRoot, kFlightDataBufferSize),
+      soilData_(kSoilDataRoot, kSoilDataBufferSize) {}
 
 void FlightController::begin() {
-  LOG_BEGIN(9600);
+  LOG_BEGIN(kSerialBaud);
   LOG_PRINTLN(F("[FC] begin(): booting flight controller"));
   LOG_PRINTLN(F("[FC] begin(): forcing auger MOSFET OFF to avoid floating gate"));
 
@@ -76,7 +76,7 @@ void FlightController::update() {
 }
 
 void FlightController::updatePreflight() {
-  if (preflightTimer_ < 50) {
+  if (preflightTimer_ < kPreflightUpdatePeriodMs) {
     return;
   }
   preflightTimer_ = 0;
@@ -91,7 +91,7 @@ void FlightController::updatePreflight() {
   float32_t accelSquared = event.un.accelerometer.x*event.un.accelerometer.x + event.un.accelerometer.y*event.un.accelerometer.y + 
   event.un.accelerometer.z*event.un.accelerometer.z;
   static elapsedMillis preflightLogTimer;
-  if (preflightLogTimer >= 500) {
+  if (preflightLogTimer >= kPreflightLogPeriodMs) {
     preflightLogTimer = 0;
     LOG_PRINT(F("[FC][PREFLIGHT] accel^2="));
     LOG_PRINT(accelSquared, 3);
@@ -121,7 +121,7 @@ void FlightController::updatePreflight() {
 }
 
 void FlightController::updateInflight() {
-  if (inflightTimer_ < 30) {
+  if (inflightTimer_ < kInflightUpdatePeriodMs) {
     return;
   }
   inflightTimer_ = 0;
@@ -135,7 +135,7 @@ void FlightController::updateInflight() {
   //flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
   flightData_.addFlightData(bnoEvent, dataFile_);
   static elapsedMillis inflightLogTimer;
-  if (inflightLogTimer >= 500) {
+  if (inflightLogTimer >= kInflightLogPeriodMs) {
     inflightLogTimer = 0;
     LOG_PRINT(F("[FC][INFLIGHT] t_ms="));
     LOG_PRINT(timeDiffInFlight);
@@ -177,7 +177,7 @@ void FlightController::updateLanded() {
 
   if (topHits_ == 0) {
     LOG_PRINTLN(F("[FC][LANDED] retracting lead screw to find top switch"));
-    leadScrewMotor_.moveMotorBackward(0.5f);
+    leadScrewMotor_.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
   if (upperSwitchPressed_) {
@@ -188,7 +188,7 @@ void FlightController::updateLanded() {
   if (bottomHits_ == 0 && topHits_ == 1) {
     LOG_PRINTLN(F("[FC][LANDED] top reached once -> drilling down and spinning auger"));
     augerMotor_.moveMosfet();
-    leadScrewMotor_.moveMotorForward(0.5f);
+    leadScrewMotor_.moveMotorForward(kLeadScrewDutyCycle);
   }
 
   if (lowerSwitchPressed_) {
@@ -206,11 +206,12 @@ void FlightController::updateLanded() {
     }
   }
 
-  if (leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 1 && augerSpinActive_ && augerSpinTimer_ >= 10000) {
+  if (leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 1 &&
+      augerSpinActive_ && augerSpinTimer_ >= kAugerSpinDurationMs) {
     LOG_PRINTLN(F("[FC][LANDED] auger spin window complete -> retracting lead screw"));
     augerSpinActive_ = false;
     leadScrewFullyExtended_ = false;
-    leadScrewMotor_.moveMotorBackward(0.5f);
+    leadScrewMotor_.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
   if (upperSwitchPressed_) {
@@ -221,7 +222,7 @@ void FlightController::updateLanded() {
 
   if (!leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 2) {
     LOG_PRINTLN(F("[FC][LANDED] drilling sequence complete -> starting water motor"));
-    waterMotor_.moveMotorForward(0.75f);
+    waterMotor_.moveMotorForward(kWaterDutyCycle);
   }
 
   float phReading = pH_;
@@ -251,7 +252,7 @@ void FlightController::updateLanded() {
   }
 
   soilData_.addSoilSensorData(nitrogenMgKg_, pH_, electricalConductivity_, dataFile_);
-  if (landedLogTimer >= 1000) {
+  if (landedLogTimer >= kLandedLogPeriodMs) {
     landedLogTimer = 0;
     LOG_PRINT(F("[FC][LANDED] counters top/bottom="));
     LOG_PRINT(topHits_);
@@ -289,7 +290,7 @@ void FlightController::checkOrientationStep() {
 
   sh2_SensorValue_t event = getBNO085Event(&bno_);
   static elapsedMillis orientLogTimer;
-  if (orientLogTimer >= 500) {
+  if (orientLogTimer >= kOrientationLogPeriodMs) {
     orientLogTimer = 0;
     LOG_PRINT(F("[FC][LANDED][ORIENT] gravity xyz=("));
     LOG_PRINT(event.un.gravity.x, 3);
@@ -300,7 +301,8 @@ void FlightController::checkOrientationStep() {
     LOG_PRINTLN(F(")"));
   }
 
-  if (event.un.gravity.z <= -9.0f && event.un.gravity.z >= -11.0f) {
+  if (event.un.gravity.z <= kOrientationAlignedZMax &&
+      event.un.gravity.z >= kOrientationAlignedZMin) {
     orientMotor_.stopMotorWithCoast();
     orientationAligned_ = true;
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete"));
@@ -309,13 +311,13 @@ void FlightController::checkOrientationStep() {
 
   if (event.un.gravity.x > 0) {
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] tilting +x -> driving motor forward"));
-    orientMotor_.moveMotorForward(1.0f);
+    orientMotor_.moveMotorForward(kOrientationDutyCycle);
   } else {
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] tilting -x -> driving motor backward"));
-    orientMotor_.moveMotorBackward(1.0f);
+    orientMotor_.moveMotorBackward(kOrientationDutyCycle);
   }
 
-  if (orientationTimer_ >= 5000) {
+  if (orientationTimer_ >= kOrientationTimeoutMs) {
     orientMotor_.stopMotorWithCoast();
     orientationAligned_ = true;
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] orientation timeout -> stopping motor"));
@@ -354,7 +356,7 @@ void FlightController::finishSoilLogging() {
 
 void FlightController::checkSensorConnections() {
   static elapsedMillis sensorLogTimer;
-  if (sensorLogTimer < 2000) {
+  if (sensorLogTimer < kSensorHealthPollMs) {
     return;
   }
   sensorLogTimer = 0;
@@ -365,7 +367,7 @@ void FlightController::checkSensorConnections() {
 }
 
 void FlightController::pollLimitSwitches() {
-  if (switchPollTimer_ < 5) {
+  if (switchPollTimer_ < kSwitchPollPeriodMs) {
     return;
   }
   switchPollTimer_ = 0;
