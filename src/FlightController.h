@@ -4,9 +4,9 @@
 #include <SD.h>
 #include <arm_math.h>
 
-//#include "BMP390.hpp"
+#include "BMP390.hpp"
 #include "BNO085.hpp"
-//#include "H3LIS331.hpp"
+#include "H3LIS331.hpp"
 #include "Soil485.h"
 #include "driverSD.hpp"
 #include "motorDriver.hpp"
@@ -68,9 +68,9 @@ private:
   motorDriver leadScrewMotor_;
   motorDriver waterMotor_;
 
-  //Adafruit_BMP3XX bmp_;
+  Adafruit_BMP3XX bmp_;
   Adafruit_BNO08x bno_;
-  //Adafruit_H3LIS331 lis_;
+  Adafruit_H3LIS331 lis_;
   Soil485 soil_;
 
   File dataFile_;

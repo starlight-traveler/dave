@@ -25,10 +25,10 @@ void FlightController::begin() {
   //setting pin 30 to low so it doesnt float
   augerMotor_.stopMosfet();
 
-  //setupBMP(&bmp_);
+  setupBMP(&bmp_);
   LOG_PRINTLN(F("[FC] begin(): initializing BNO085"));
   setupBNO085(&bno_);
-  //setupH3LIS331(&lis_);
+  setupH3LIS331(&lis_);
 
   LOG_PRINTLN(F("[FC] begin(): configuring limit switch GPIO"));
   pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
@@ -81,10 +81,10 @@ void FlightController::updatePreflight() {
   }
   preflightTimer_ = 0;
 
-  //sensors_event_t accel = getH3LIS331Accel(&lis_);
-  // float32_t accelSquared = accel.acceleration.x * accel.acceleration.x
-  //                        + accel.acceleration.y * accel.acceleration.y
-  //                        + accel.acceleration.z * accel.acceleration.z;
+  sensors_event_t accel = getH3LIS331Accel(&lis_);
+  float32_t accelSquared = accel.acceleration.x * accel.acceleration.x
+                         + accel.acceleration.y * accel.acceleration.y
+                         + accel.acceleration.z * accel.acceleration.z;
 
   sh2_SensorValue_t event = getBNO085Event(&bno_);
 
@@ -105,7 +105,7 @@ void FlightController::updatePreflight() {
     LOG_PRINTLN(F("[FC][PREFLIGHT] launch threshold crossed -> INFLIGHT"));
     state_ = INFLIGHT;
     inflightStartTime_ = millis();
-    //previousAltitude_ = getAltitude(&bmp_);
+    previousAltitude_ = getAltitude(&bmp_);
     preflightStateTimer_ = 0;
   }
 
@@ -127,13 +127,12 @@ void FlightController::updateInflight() {
   inflightTimer_ = 0;
 
   const uint32_t timeDiffInFlight = millis() - inflightStartTime_;
-  //sensors_event_t accel = getH3LIS331Accel(&lis_);
+  sensors_event_t accel = getH3LIS331Accel(&lis_);
   sh2_SensorValue_t bnoEvent = getBNO085Event(&bno_);
-  //float32_t altitude = getAltitude(&bmp_);
+  float32_t altitude = getAltitude(&bmp_);
 
   startFlightLoggingIfNeeded();
-  //flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
-  flightData_.addFlightData(bnoEvent, dataFile_);
+  flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
   static elapsedMillis inflightLogTimer;
   if (inflightLogTimer >= kInflightLogPeriodMs) {
     inflightLogTimer = 0;
@@ -148,15 +147,14 @@ void FlightController::updateInflight() {
     LOG_PRINTLN(F(")"));
   }
 
-  // currentAltitude_ = altitude;
-  // if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
-  //   altitudeBelowThresholdCount_++;
-  // } else {
-  //   altitudeBelowThresholdCount_ = 0;
-  // }
+  currentAltitude_ = altitude;
+  if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
+    altitudeBelowThresholdCount_++;
+  } else {
+    altitudeBelowThresholdCount_ = 0;
+  }
 
-  // if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
-  if (timeDiffInFlight > kInflightTimeoutMs) {
+  if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
     LOG_PRINTLN(F("[FC][INFLIGHT] timeout reached -> LANDED"));
     state_ = LANDED;
     landedStartTime_ = millis();
@@ -362,8 +360,8 @@ void FlightController::checkSensorConnections() {
   sensorLogTimer = 0;
   LOG_PRINTLN(F("[FC] checkSensorConnections(): polling BNO health"));
   checkBNO085Connection(&bno_);
-  //checkBMP390Connection(&bmp_);
-  //checkH3LIS331Connection(&lis_);
+  checkBMP390Connection(&bmp_);
+  checkH3LIS331Connection(&lis_);
 }
 
 void FlightController::pollLimitSwitches() {
