@@ -3,9 +3,8 @@
 #include <Arduino.h>
 #include <SD.h>
 #include <arm_math.h>
-
 #include "BMP390.hpp"
-#include "BNO085.hpp"
+#include "BNO055.hpp"
 #include "H3LIS331.hpp"
 #include "Soil485.h"
 #include "driverSD.hpp"
@@ -69,7 +68,7 @@ private:
   motorDriver waterMotor_;
 
   Adafruit_BMP3XX bmp_;
-  Adafruit_BNO08x bno_;
+  Adafruit_BNO055 bno_ =  Adafruit_BNO055(55, 0x28);
   Adafruit_H3LIS331 lis_;
   Soil485 soil_;
 
