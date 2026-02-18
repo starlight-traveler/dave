@@ -1,8 +1,6 @@
 #include "FlightController.h"
-
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
-
 #include "Config.h"
 #include "DebugLog.h"
 
@@ -25,10 +23,13 @@ void FlightController::begin() {
   //setting pin 30 to low so it doesnt float
   augerMotor_.stopMosfet();
 
-  //setupBMP(&bmp_);
+  //setting this to true to get more accurate data
+  bno_.setExtCrystalUse(true);
+
+  setupBMP(&bmp_);
   LOG_PRINTLN(F("[FC] begin(): initializing BNO085"));
-  setupBNO085(&bno_);
-  //setupH3LIS331(&lis_);
+  setupBNO055(&bno_);
+  setupICM20649(&icm);
 
   LOG_PRINTLN(F("[FC] begin(): configuring limit switch GPIO"));
   pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
@@ -81,31 +82,35 @@ void FlightController::updatePreflight() {
   }
   preflightTimer_ = 0;
 
-  //sensors_event_t accel = getH3LIS331Accel(&lis_);
-  // float32_t accelSquared = accel.acceleration.x * accel.acceleration.x
-  //                        + accel.acceleration.y * accel.acceleration.y
-  //                        + accel.acceleration.z * accel.acceleration.z;
+  sensors_event_t accelICM = getICM20649Accel(&icm);
+  float32_t accelICMSquared = accelICM.acceleration.x * accelICM.acceleration.x
+                         + accelICM.acceleration.y * accelICM.acceleration.y
+                         + accelICM.acceleration.z * accelICM.acceleration.z;
 
-  sh2_SensorValue_t event = getBNO085Event(&bno_);
 
-  float32_t accelSquared = event.un.accelerometer.x*event.un.accelerometer.x + event.un.accelerometer.y*event.un.accelerometer.y + 
-  event.un.accelerometer.z*event.un.accelerometer.z;
+  sensors_event_t accelBNO = getBNO055Event(&bno_);
+  float32_t accelBNOSquared = accelBNO.acceleration.x * accelBNO.acceleration.x
+                         + accelBNO.acceleration.y * accelBNO.acceleration.y
+                         + accelBNO.acceleration.z * accelBNO.acceleration.z;
+
+  float currentAlt = getAltitude(&bmp_); //getting current altitude
+
   static elapsedMillis preflightLogTimer;
   if (preflightLogTimer >= kPreflightLogPeriodMs) {
     preflightLogTimer = 0;
     LOG_PRINT(F("[FC][PREFLIGHT] accel^2="));
-    LOG_PRINT(accelSquared, 3);
+    LOG_PRINT(accelICMSquared, 3);
     LOG_PRINT(F(" threshold="));
     LOG_PRINT(kAccelThresholdSquared, 3);
     LOG_PRINT(F(" elapsed_ms="));
     LOG_PRINTLN(static_cast<uint32_t>(preflightStateTimer_));
   }
 
-  if (accelSquared > kAccelThresholdSquared) {
+  if (accelICMSquared > kAccelThresholdSquared && accelBNOSquared > kAccelThresholdSquared) { // make sure both sensors read above the threshold
     LOG_PRINTLN(F("[FC][PREFLIGHT] launch threshold crossed -> INFLIGHT"));
     state_ = INFLIGHT;
     inflightStartTime_ = millis();
-    //previousAltitude_ = getAltitude(&bmp_);
+    previousAltitude_ = currentAlt;
     preflightStateTimer_ = 0;
   }
 
@@ -123,36 +128,34 @@ void FlightController::updateInflight() {
   inflightTimer_ = 0;
 
   const uint32_t timeDiffInFlight = millis() - inflightStartTime_;
-  //sensors_event_t accel = getH3LIS331Accel(&lis_);
-  sh2_SensorValue_t bnoEvent = getBNO085Event(&bno_);
-  //float32_t altitude = getAltitude(&bmp_);
+  sensors_event_t accel = getICM20649Accel(&icm);
+  sensors_event_t orient = getBNO055Event(&bno_);
+  float32_t altitude = getAltitude(&bmp_);
 
   startFlightLoggingIfNeeded();
-  //flightData_.addFlightData(accel, bnoEvent, altitude, dataFile_);
-  flightData_.addFlightData(bnoEvent, dataFile_);
+  flightData_.addFlightData(accel, orient, altitude, dataFile_);
   static elapsedMillis inflightLogTimer;
   if (inflightLogTimer >= kInflightLogPeriodMs) {
     inflightLogTimer = 0;
     LOG_PRINT(F("[FC][INFLIGHT] t_ms="));
     LOG_PRINT(timeDiffInFlight);
     LOG_PRINT(F(" accel_xyz=("));
-    LOG_PRINT(bnoEvent.un.accelerometer.x, 3);
+    LOG_PRINT(accel.acceleration.x, 3);
     LOG_PRINT(F(","));
-    LOG_PRINT(bnoEvent.un.accelerometer.y, 3);
+    LOG_PRINT(accel.acceleration.y, 3);
     LOG_PRINT(F(","));
-    LOG_PRINT(bnoEvent.un.accelerometer.z, 3);
+    LOG_PRINT(accel.acceleration.z, 3);
     LOG_PRINTLN(F(")"));
   }
 
-  // currentAltitude_ = altitude;
-  // if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
-  //   altitudeBelowThresholdCount_++;
-  // } else {
-  //   altitudeBelowThresholdCount_ = 0;
-  // }
+  currentAltitude_ = altitude;
+  if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
+    altitudeBelowThresholdCount_++;
+  } else {
+    altitudeBelowThresholdCount_ = 0;
+  }
 
-  // if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
-  if (timeDiffInFlight > kInflightTimeoutMs) {
+  if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
     LOG_PRINTLN(F("[FC][INFLIGHT] timeout reached -> LANDED"));
     finishFlightLogging();
     enterLandedState();
@@ -307,28 +310,28 @@ void FlightController::checkOrientationStep() {
     return;
   }
 
-  sh2_SensorValue_t event = getBNO085Event(&bno_);
+  sensors_event_t event = getBNO055Event(&bno_);
   static elapsedMillis orientLogTimer;
   if (orientLogTimer >= kOrientationLogPeriodMs) {
     orientLogTimer = 0;
     LOG_PRINT(F("[FC][LANDED][ORIENT] gravity xyz=("));
-    LOG_PRINT(event.un.gravity.x, 3);
+    LOG_PRINT(event.orientation.x, 3);
     LOG_PRINT(F(","));
-    LOG_PRINT(event.un.gravity.y, 3);
+    LOG_PRINT(event.orientation.y, 3);
     LOG_PRINT(F(","));
-    LOG_PRINT(event.un.gravity.z, 3);
+    LOG_PRINT(event.orientation.z, 3);
     LOG_PRINTLN(F(")"));
   }
 
-  if (event.un.gravity.z <= kOrientationAlignedZMax &&
-      event.un.gravity.z >= kOrientationAlignedZMin) {
+  if (event.orientation.z <= kOrientationAlignedZMax &&
+     event.orientation.z >= kOrientationAlignedZMin) {
     orientMotor_.stopMotorWithCoast();
     orientationAligned_ = true;
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete"));
     return;
   }
 
-  if (event.un.gravity.x > 0) {
+  if (event.orientation.x > 0) {
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] tilting +x -> driving motor forward"));
     orientMotor_.moveMotorForward(kOrientationDutyCycle);
   } else {
@@ -380,9 +383,9 @@ void FlightController::checkSensorConnections() {
   }
   sensorLogTimer = 0;
   LOG_PRINTLN(F("[FC] checkSensorConnections(): polling BNO health"));
-  checkBNO085Connection(&bno_);
-  //checkBMP390Connection(&bmp_);
-  //checkH3LIS331Connection(&lis_);
+  checkBNO055Connection(&bno_);
+  checkBMP390Connection(&bmp_);
+  checkICMConnection(&icm);
 }
 
 void FlightController::pollLimitSwitches() {

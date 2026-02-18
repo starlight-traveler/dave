@@ -2,7 +2,6 @@
 #include <SD.h>
 #include <arm_math.h>
 #include <Adafruit_Sensor.h>
-#include <sh2_SensorValue.h>
 
 #ifndef driverSD_H
 #define driverSD_H
@@ -23,13 +22,10 @@ class driverSD {
         const char* getCurrentFileName();
         int getCurrentIndex();
         void increaseCurrentIndexBy(int increment);
-        void addLandedData(sh2_SensorValue_t event, File &dataFile);
-        void addFlightData(sh2_SensorValue_t gameRotationVector, File &dataFile);
-        //void addFlightData(sensors_event_t linearAccelData, sh2_SensorValue_t gameRotationVector, float32_t altitude, File dataFile);
-        void addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File &dataFile);
-        //need a void addSoilData function here too
-        void printFlightDataToFile(File &dataFile);
-        void printSoilDataToFile(File &dataFile);
+        void addFlightData(sensors_event_t accel, sensors_event_t event, float32_t altitude, File dataFile);
+        void addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File dataFile);
+        void printFlightDataToFile(File dataFile);
+        void printSoilDataToFile(File dataFile);
 
 };
 
