@@ -55,12 +55,13 @@ void setupBNO055(Adafruit_BNO055 *bno){
     //connecting to the bno three times in a row as apart of the startup process, im assuming to get rid of faulty early values
     for (uint8_t attempt = 0; attempt < kBnoStartupInitAttempts; attempt) {
         if (reconnectBNO055(bno)) { // it it connects
+            bno->setExtCrystalUse(true);
             lastEventMs = millis(); //setting the last event found to current
             lastReconnectAttemptMs = 0; // no attemps thus far
             return;
         }
         lastReconnectAttemptMs = millis(); // adding this because it should be documented nontheless
-        delay(kBnoStartupRetryDelayMs); //waiting 50 seconds before gong again
+        delay(kBnoStartupRetryDelayMs); //waiting 50 ms before going again
     }
 
 }
@@ -77,6 +78,5 @@ sensors_event_t getBNO055Event(Adafruit_BNO055 *bno){
   return event;
 
 }
-
 
 

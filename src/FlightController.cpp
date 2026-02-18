@@ -1,8 +1,25 @@
 #include "FlightController.h"
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
+#include <math.h>
 #include "Config.h"
 #include "DebugLog.h"
+
+namespace {
+constexpr float32_t kMaxReasonableAccelMs2 = 200.0f;
+
+bool isFiniteAndReasonable(float32_t value) {
+  return isfinite(value) && fabsf(value) <= kMaxReasonableAccelMs2;
+}
+
+bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
+  return isFiniteAndReasonable(x) && isFiniteAndReasonable(y) && isFiniteAndReasonable(z);
+}
+
+float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
+  return x * x + y * y + z * z;
+}
+}
 
 /** @brief Construct controller with configured hardware. */
 FlightController::FlightController(HardwareSerial &modbus)
@@ -22,9 +39,6 @@ void FlightController::begin() {
 
   //setting pin 30 to low so it doesnt float
   augerMotor_.stopMosfet();
-
-  //setting this to true to get more accurate data
-  bno_.setExtCrystalUse(true);
 
   setupBMP(&bmp_);
   LOG_PRINTLN(F("[FC] begin(): initializing BNO085"));
@@ -83,15 +97,18 @@ void FlightController::updatePreflight() {
   preflightTimer_ = 0;
 
   sensors_event_t accelICM = getICM20649Accel(&icm);
-  float32_t accelICMSquared = accelICM.acceleration.x * accelICM.acceleration.x
-                         + accelICM.acceleration.y * accelICM.acceleration.y
-                         + accelICM.acceleration.z * accelICM.acceleration.z;
+  const bool icmAccelSane = accelVectorIsSane(
+      accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z);
+  const float32_t accelICMSquared = icmAccelSane
+      ? squaredMagnitude(accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z)
+      : 0.0f;
 
-
-  sensors_event_t accelBNO = getBNO055Event(&bno_);
-  float32_t accelBNOSquared = accelBNO.acceleration.x * accelBNO.acceleration.x
-                         + accelBNO.acceleration.y * accelBNO.acceleration.y
-                         + accelBNO.acceleration.z * accelBNO.acceleration.z;
+  const imu::Vector<3> bnoLinearAccel = bno_.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+  const bool bnoAccelSane = accelVectorIsSane(
+      bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z());
+  const float32_t accelBNOSquared = bnoAccelSane
+      ? squaredMagnitude(bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z())
+      : 0.0f;
 
   float currentAlt = getAltitude(&bmp_); //getting current altitude
 
@@ -104,9 +121,15 @@ void FlightController::updatePreflight() {
     LOG_PRINT(kAccelThresholdSquared, 3);
     LOG_PRINT(F(" elapsed_ms="));
     LOG_PRINTLN(static_cast<uint32_t>(preflightStateTimer_));
+    LOG_PRINT(F("[FC][PREFLIGHT] accel sanity ICM/BNO="));
+    LOG_PRINT(icmAccelSane ? F("OK") : F("BAD"));
+    LOG_PRINT(F("/"));
+    LOG_PRINTLN(bnoAccelSane ? F("OK") : F("BAD"));
   }
 
-  if (accelICMSquared > kAccelThresholdSquared && accelBNOSquared > kAccelThresholdSquared) { // make sure both sensors read above the threshold
+  if (icmAccelSane && bnoAccelSane &&
+      accelICMSquared > kAccelThresholdSquared &&
+      accelBNOSquared > kAccelThresholdSquared) { // make sure both sensors read above the threshold
     LOG_PRINTLN(F("[FC][PREFLIGHT] launch threshold crossed -> INFLIGHT"));
     state_ = INFLIGHT;
     inflightStartTime_ = millis();
@@ -149,7 +172,7 @@ void FlightController::updateInflight() {
   }
 
   currentAltitude_ = altitude;
-  if (abs(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
+  if (fabsf(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
     altitudeBelowThresholdCount_++;
   } else {
     altitudeBelowThresholdCount_ = 0;
@@ -310,28 +333,41 @@ void FlightController::checkOrientationStep() {
     return;
   }
 
-  sensors_event_t event = getBNO055Event(&bno_);
+  const imu::Vector<3> gravity = bno_.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+  const float32_t gravityX = gravity.x();
+  const float32_t gravityY = gravity.y();
+  const float32_t gravityZ = gravity.z();
+  if (!accelVectorIsSane(gravityX, gravityY, gravityZ)) {
+    static elapsedMillis invalidGravityLogTimer;
+    if (invalidGravityLogTimer >= kOrientationLogPeriodMs) {
+      invalidGravityLogTimer = 0;
+      LOG_PRINTLN(F("[FC][LANDED][ORIENT] gravity invalid, skipping orientation step"));
+    }
+    orientMotor_.stopMotorWithCoast();
+    return;
+  }
+
   static elapsedMillis orientLogTimer;
   if (orientLogTimer >= kOrientationLogPeriodMs) {
     orientLogTimer = 0;
     LOG_PRINT(F("[FC][LANDED][ORIENT] gravity xyz=("));
-    LOG_PRINT(event.orientation.x, 3);
+    LOG_PRINT(gravityX, 3);
     LOG_PRINT(F(","));
-    LOG_PRINT(event.orientation.y, 3);
+    LOG_PRINT(gravityY, 3);
     LOG_PRINT(F(","));
-    LOG_PRINT(event.orientation.z, 3);
+    LOG_PRINT(gravityZ, 3);
     LOG_PRINTLN(F(")"));
   }
 
-  if (event.orientation.z <= kOrientationAlignedZMax &&
-     event.orientation.z >= kOrientationAlignedZMin) {
+  if (gravityZ <= kOrientationAlignedZMax &&
+     gravityZ >= kOrientationAlignedZMin) {
     orientMotor_.stopMotorWithCoast();
     orientationAligned_ = true;
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete"));
     return;
   }
 
-  if (event.orientation.x > 0) {
+  if (gravityX > 0) {
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] tilting +x -> driving motor forward"));
     orientMotor_.moveMotorForward(kOrientationDutyCycle);
   } else {

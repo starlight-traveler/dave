@@ -22,10 +22,10 @@ class driverSD {
         const char* getCurrentFileName();
         int getCurrentIndex();
         void increaseCurrentIndexBy(int increment);
-        void addFlightData(sensors_event_t accel, sensors_event_t event, float32_t altitude, File dataFile);
-        void addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File dataFile);
-        void printFlightDataToFile(File dataFile);
-        void printSoilDataToFile(File dataFile);
+        void addFlightData(sensors_event_t accel, sensors_event_t event, float32_t altitude, File &dataFile);
+        void addSoilSensorData(float32_t nitrogenPercentage, float32_t pH, float32_t electricalConductivity, File &dataFile);
+        void printFlightDataToFile(File &dataFile);
+        void printSoilDataToFile(File &dataFile);
 
 };
 
