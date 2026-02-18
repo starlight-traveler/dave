@@ -1,5 +1,16 @@
 #include "motorDriver.hpp"
 
+namespace {
+int dutyToPwm(float dutyCycle) {
+    if (dutyCycle < 0.0f) {
+        dutyCycle = 0.0f;
+    } else if (dutyCycle > 1.0f) {
+        dutyCycle = 1.0f;
+    }
+    return static_cast<int>(255.0f * dutyCycle);
+}
+}
+
 //Here are the datasheets for all of the motor drivers being used:
 //https://www.ti.com/lit/ds/symlink/drv8874.pdf?HQS=dis-dk-null-digikeymode-dsf-pf-null-wwe&ts=1768564255162&ref_url=https%253A%252F%252Fwww.ti.com%252Fgeneral%252Fdocs%252Fsuppproductinfo.tsp%253FdistId%253D10%2526gotoUrl%253Dhttps%253A%252F%252Fwww.ti.com%252Flit%252Fgpn%252Fdrv8874
 //https://www.ti.com/lit/ds/symlink/drv8244-q1.pdf?ts=1701345632184
@@ -17,7 +28,9 @@ motorDriver::motorDriver(int in1, int in2, int nSleep){
 
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
-    pinMode(nSLEEP, OUTPUT);
+    if (nSleep != -1) {
+        pinMode(nSLEEP, OUTPUT);
+    }
 
     if (nSleep != -1) {
         digitalWrite(nSLEEP, HIGH);
@@ -32,8 +45,12 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault){
 
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
-    pinMode(nSLEEP, OUTPUT);
-    pinMode(nFault, INPUT);
+    if (nSleep != -1) {
+        pinMode(nSLEEP, OUTPUT);
+    }
+    if (nFault != -1) {
+        pinMode(nFault, INPUT);
+    }
 
     if (nSleep != -1) {
         digitalWrite(nSLEEP, HIGH);
@@ -49,13 +66,21 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
 
     pinMode(IN1, OUTPUT);
     pinMode(IN2, OUTPUT);
-    pinMode(nSLEEP, OUTPUT);
-    pinMode(nFault, INPUT);
-    pinMode(DRVOFF, OUTPUT);
+    if (nSleep != -1) {
+        pinMode(nSLEEP, OUTPUT);
+    }
+    if (nFault != -1) {
+        pinMode(nFault, INPUT);
+    }
+    if (DRVOFF != -1) {
+        pinMode(DRVOFF, OUTPUT);
+    }
 
     //in order to turn the motor with DRVOFF, the pin must be set to 0 in order for anything to run. If it is
     // set to one, it nothing will work
+    if (DRVOFF != -1) {
         digitalWrite(DRVOFF, LOW);
+    }
 
 
     if (nSleep != -1) {
@@ -74,7 +99,7 @@ void motorDriver::stopMosfet(){
 //this function will cause the motor to move forward
 void motorDriver::moveMotorForward(float dutyCycle) {
     if(drvControlOn==false){
-    analogWrite(IN1, int(255*dutyCycle)); //it seems like high is the same as 1 or true
+    analogWrite(IN1, dutyToPwm(dutyCycle)); //it seems like high is the same as 1 or true
     analogWrite(IN2, 0);   //low is the same as 0 or false
     }
 }
@@ -83,7 +108,7 @@ void motorDriver::moveMotorForward(float dutyCycle) {
 void motorDriver::moveMotorBackward(float dutyCycle) {
     if(drvControlOn==false){
     analogWrite(IN1, 0);
-    analogWrite(IN2, int(255*dutyCycle));
+    analogWrite(IN2, dutyToPwm(dutyCycle));
     }
 
 }
@@ -99,18 +124,16 @@ void motorDriver::stopMotorWithCoast() {
 //this function will get the status of the nFault pin (if the motor has it), and will return true if the nFault pin has returned low 
 // voltage (indecating) something is wrong, and false if the pin returns high voltage, which indicates everything is alright
 bool motorDriver::nFaultPulledLow(){
-    if(drvControlOn==false){
-    if (digitalRead(nFault) == LOW)
-        return true;
-    else
+    if (drvControlOn == true || nFault == -1) {
         return false;
     }
+    return digitalRead(nFault) == LOW;
 }
 
 //this method will check to see if the nFault pin is true (which means something is wrong with the motor), and if so
 //turning the DRVOFF pin on high so it stops working overall
 void motorDriver::turnOnDRVOFF(){
-    if(nFaultPulledLow()==true){
+    if(DRVOFF != -1 && nFaultPulledLow()==true){
         digitalWrite(DRVOFF, HIGH);
         drvControlOn = true;
     }

@@ -42,8 +42,8 @@ private:
   void updateInflight();
   /** @brief Run landed state logic and soil sampling. */
   void updateLanded();
-  /** @brief Orient the payload so the auger faces downward. */
-  void checkOrientation();
+  /** @brief Enter landed state and reset landed-sequence bookkeeping. */
+  void enterLandedState();
   /** @brief Open the flight log file if it is not already open. */
   void startFlightLoggingIfNeeded();
   /** @brief Open the soil log file if it is not already open. */
@@ -98,8 +98,11 @@ private:
   bool leadScrewFullyExtended_ = false;
   bool augerSpinActive_ = false;
   bool orientationAligned_ = false;
+  bool landedFinalized_ = false;
   bool upperSwitchPressed_ = false;
   bool lowerSwitchPressed_ = false;
+  bool upperSwitchLatched_ = false;
+  bool lowerSwitchLatched_ = false;
   elapsedMillis preflightTimer_;
   elapsedMillis preflightStateTimer_;
   elapsedMillis inflightTimer_;

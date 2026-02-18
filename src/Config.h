@@ -8,7 +8,7 @@ constexpr uint32_t kSerialBaud = 9600;
 constexpr uint32_t kMainHeartbeatMs = 1000;
 
 // -------------------- Soil/RS-485 --------------------
-constexpr uint8_t kRs485DirPin = 2;
+constexpr uint8_t kRs485DirPin = 4;
 constexpr uint8_t kSoilSensorSlaveId = 0x01;
 constexpr uint32_t kSoilSensorBaud = 9600;
 

@@ -5,11 +5,11 @@
 
 class motorDriver {
     private:
-        int IN1;
-        int IN2;
-        int nSLEEP;
-        int nFault;
-        int DRVOFF;
+        int IN1 = -1;
+        int IN2 = -1;
+        int nSLEEP = -1;
+        int nFault = -1;
+        int DRVOFF = -1;
         bool drvControlOn = false;
 
     public:

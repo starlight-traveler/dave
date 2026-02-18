@@ -26,3 +26,4 @@ void loop() {
   LOG_PRINTLN(event.un.accelerometer.z, 4);
   delay(kTestBnoSamplePeriodMs);
 }
+

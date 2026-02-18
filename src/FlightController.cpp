@@ -111,11 +111,7 @@ void FlightController::updatePreflight() {
 
   if (preflightStateTimer_ >= kPreflightTimeoutMs) {
     LOG_PRINTLN(F("[FC][PREFLIGHT] timeout reached -> LANDED"));
-    state_ = LANDED;
-    landedStartTime_ = millis();
-    orientationAligned_ = false;
-    orientationTimer_ = 0;
-    switchPollTimer_ = 0;
+    enterLandedState();
   }
 
 }
@@ -158,29 +154,33 @@ void FlightController::updateInflight() {
   // if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
   if (timeDiffInFlight > kInflightTimeoutMs) {
     LOG_PRINTLN(F("[FC][INFLIGHT] timeout reached -> LANDED"));
-    state_ = LANDED;
-    landedStartTime_ = millis();
-    orientationAligned_ = false;
-    orientationTimer_ = 0;
-    switchPollTimer_ = 0;
     finishFlightLogging();
+    enterLandedState();
   }
 
   previousAltitude_ = currentAltitude_;
 }
 
 void FlightController::updateLanded() {
+  if (landedFinalized_) {
+    return;
+  }
+
   startSoilLoggingIfNeeded();
   checkOrientationStep();
   pollLimitSwitches();
   static elapsedMillis landedLogTimer;
+  const bool upperRisingEdge = upperSwitchPressed_ && !upperSwitchLatched_;
+  const bool lowerRisingEdge = lowerSwitchPressed_ && !lowerSwitchLatched_;
+  upperSwitchLatched_ = upperSwitchPressed_;
+  lowerSwitchLatched_ = lowerSwitchPressed_;
 
   if (topHits_ == 0) {
     LOG_PRINTLN(F("[FC][LANDED] retracting lead screw to find top switch"));
     leadScrewMotor_.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
-  if (upperSwitchPressed_) {
+  if (upperRisingEdge && topHits_ == 0) {
     LOG_PRINTLN(F("[FC][LANDED] upper switch active"));
     topHits_++;
   }
@@ -191,7 +191,7 @@ void FlightController::updateLanded() {
     leadScrewMotor_.moveMotorForward(kLeadScrewDutyCycle);
   }
 
-  if (lowerSwitchPressed_) {
+  if (lowerRisingEdge && bottomHits_ == 0) {
     LOG_PRINTLN(F("[FC][LANDED] lower switch active"));
     bottomHits_++;
   }
@@ -214,7 +214,7 @@ void FlightController::updateLanded() {
     leadScrewMotor_.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
-  if (upperSwitchPressed_) {
+  if (upperRisingEdge && !leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 1) {
     LOG_PRINTLN(F("[FC][LANDED] upper switch active while retracting -> stop lead screw"));
     leadScrewMotor_.stopMotorWithCoast();
     topHits_++;
@@ -272,6 +272,8 @@ void FlightController::updateLanded() {
     orientMotor_.stopMotorWithCoast();
 
     finishSoilLogging();
+    landedFinalized_ = true;
+    return;
   }
 
   if (topHits_ == 2 && bottomHits_ == 1) {
@@ -281,6 +283,23 @@ void FlightController::updateLanded() {
   }
 
   state_ = LANDED;
+}
+
+void FlightController::enterLandedState() {
+  state_ = LANDED;
+  landedStartTime_ = millis();
+  orientationAligned_ = false;
+  orientationTimer_ = 0;
+  switchPollTimer_ = 0;
+  upperSwitchPressed_ = false;
+  lowerSwitchPressed_ = false;
+  upperSwitchLatched_ = false;
+  lowerSwitchLatched_ = false;
+  topHits_ = 0;
+  bottomHits_ = 0;
+  leadScrewFullyExtended_ = false;
+  augerSpinActive_ = false;
+  landedFinalized_ = false;
 }
 
 void FlightController::checkOrientationStep() {
