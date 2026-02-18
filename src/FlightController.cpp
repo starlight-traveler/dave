@@ -20,6 +20,12 @@ bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
   return isFiniteAndReasonable(x) && isFiniteAndReasonable(y) && isFiniteAndReasonable(z);
 }
 
+bool altitudeIsSane(float32_t altitudeM) {
+  return __builtin_isfinite(altitudeM) &&
+         altitudeM >= kAltitudeValidMinM &&
+         altitudeM <= kAltitudeValidMaxM;
+}
+
 float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
   float32_t vec[3] = {x, y, z};
   float32_t magnitudeSquared = 0.0f;
@@ -117,7 +123,19 @@ void FlightController::updatePreflight() {
       ? squaredMagnitude(bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z())
       : 0.0f;
 
-  float currentAlt = getAltitude(&bmp_); //getting current altitude
+  const float32_t currentAlt = getAltitude(&bmp_); //getting current altitude
+  const bool altitudeValid = altitudeIsSane(currentAlt);
+  const bool launchSample = icmAccelSane && bnoAccelSane &&
+                            accelICMSquared > kAccelThresholdSquared &&
+                            accelBNOSquared > kAccelThresholdSquared;
+
+  if (launchSample) {
+    if (launchDetectCount_ < kLaunchDetectConsecutiveSamples) {
+      launchDetectCount_++;
+    }
+  } else {
+    launchDetectCount_ = 0;
+  }
 
   static elapsedMillis preflightLogTimer;
   if (preflightLogTimer >= kPreflightLogPeriodMs) {
@@ -132,16 +150,32 @@ void FlightController::updatePreflight() {
     LOG_PRINT(icmAccelSane ? F("OK") : F("BAD"));
     LOG_PRINT(F("/"));
     LOG_PRINTLN(bnoAccelSane ? F("OK") : F("BAD"));
+    LOG_PRINT(F("[FC][PREFLIGHT] launch confirm count="));
+    LOG_PRINT(launchDetectCount_);
+    LOG_PRINT(F("/"));
+    LOG_PRINTLN(kLaunchDetectConsecutiveSamples);
+    if (!altitudeValid) {
+      LOG_PRINTLN(F("[FC][PREFLIGHT] altitude invalid; inflight baseline will defer"));
+    }
   }
 
-  if (icmAccelSane && bnoAccelSane &&
-      accelICMSquared > kAccelThresholdSquared &&
-      accelBNOSquared > kAccelThresholdSquared) { // make sure both sensors read above the threshold
+  if (launchDetectCount_ >= kLaunchDetectConsecutiveSamples) {
     LOG_PRINTLN(F("[FC][PREFLIGHT] launch threshold crossed -> INFLIGHT"));
     state_ = INFLIGHT;
     inflightStartTime_ = millis();
-    previousAltitude_ = currentAlt;
+    landingDetectCount_ = 0;
+    if (altitudeValid) {
+      previousAltitude_ = currentAlt;
+      currentAltitude_ = currentAlt;
+      hasValidInflightAltitude_ = true;
+    } else {
+      previousAltitude_ = 0.0f;
+      currentAltitude_ = 0.0f;
+      hasValidInflightAltitude_ = false;
+    }
+    launchDetectCount_ = 0;
     preflightStateTimer_ = 0;
+    return;
   }
 
   if (preflightStateTimer_ >= kPreflightTimeoutMs) {
@@ -160,7 +194,13 @@ void FlightController::updateInflight() {
   const uint32_t timeDiffInFlight = millis() - inflightStartTime_;
   sensors_event_t accel = getICM20649Accel(&icm);
   sensors_event_t orient = getBNO055Event(&bno_);
-  float32_t altitude = getAltitude(&bmp_);
+  const float32_t altitude = getAltitude(&bmp_);
+  const bool altitudeValid = altitudeIsSane(altitude);
+  const bool accelValid = accelVectorIsSane(
+      accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
+  const float32_t accelSquared = accelValid
+      ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z)
+      : 0.0f;
 
   startFlightLoggingIfNeeded();
   flightData_.addFlightData(accel, orient, altitude, dataFile_);
@@ -176,22 +216,56 @@ void FlightController::updateInflight() {
     LOG_PRINT(F(","));
     LOG_PRINT(accel.acceleration.z, 3);
     LOG_PRINTLN(F(")"));
+    LOG_PRINT(F("[FC][INFLIGHT] accel/alt sane="));
+    LOG_PRINT(accelValid ? F("OK") : F("BAD"));
+    LOG_PRINT(F("/"));
+    LOG_PRINTLN(altitudeValid ? F("OK") : F("BAD"));
   }
 
-  currentAltitude_ = altitude;
-  if (absScalarF32(currentAltitude_ - previousAltitude_) < kMinChangeInAltitude) {
-    altitudeBelowThresholdCount_++;
+  if (altitudeValid) {
+    if (!hasValidInflightAltitude_) {
+      previousAltitude_ = altitude;
+      currentAltitude_ = altitude;
+      hasValidInflightAltitude_ = true;
+    } else {
+      currentAltitude_ = altitude;
+    }
   } else {
-    altitudeBelowThresholdCount_ = 0;
+    landingDetectCount_ = 0;
   }
 
-  if (altitudeBelowThresholdCount_ == kAltitudeBelowThresholdCount || timeDiffInFlight > kInflightTimeoutMs) {
+  const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs;
+  bool landingSample = false;
+  if (landingEvalArmed && altitudeValid && hasValidInflightAltitude_ && accelValid) {
+    const bool altitudeStable =
+        absScalarF32(currentAltitude_ - previousAltitude_) <= kLandingAltitudeDeltaThresholdM;
+    const bool lowAccel = accelSquared <= kLandingAccelThresholdSquared;
+    landingSample = altitudeStable && lowAccel;
+  }
+
+  if (landingSample) {
+    if (landingDetectCount_ < kLandingDetectConsecutiveSamples) {
+      landingDetectCount_++;
+    }
+  } else if (landingEvalArmed) {
+    landingDetectCount_ = 0;
+  }
+
+  if (landingEvalArmed && landingDetectCount_ >= kLandingDetectConsecutiveSamples) {
+    LOG_PRINTLN(F("[FC][INFLIGHT] landing criteria met -> LANDED"));
+    finishFlightLogging();
+    enterLandedState();
+    return;
+  } else if (timeDiffInFlight > kInflightTimeoutMs) {
     LOG_PRINTLN(F("[FC][INFLIGHT] timeout reached -> LANDED"));
     finishFlightLogging();
     enterLandedState();
+    return;
   }
 
-  previousAltitude_ = currentAltitude_;
+  if (altitudeValid && hasValidInflightAltitude_) {
+    previousAltitude_ = currentAltitude_;
+  }
 }
 
 void FlightController::updateLanded() {
@@ -330,6 +404,9 @@ void FlightController::enterLandedState() {
   lowerSwitchLatched_ = false;
   topHits_ = 0;
   bottomHits_ = 0;
+  launchDetectCount_ = 0;
+  landingDetectCount_ = 0;
+  hasValidInflightAltitude_ = false;
   leadScrewFullyExtended_ = false;
   augerSpinActive_ = false;
   landedFinalized_ = false;

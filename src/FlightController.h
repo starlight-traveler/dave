@@ -86,10 +86,12 @@ private:
 
   int32_t topHits_ = 0;
   int32_t bottomHits_ = 0;
-  int32_t altitudeBelowThresholdCount_ = 0;
+  uint16_t launchDetectCount_ = 0;
+  uint16_t landingDetectCount_ = 0;
 
   float32_t currentAltitude_ = 0.0f;
   float32_t previousAltitude_ = 0.0f;
+  bool hasValidInflightAltitude_ = false;
 
   driverSD flightData_;
   driverSD soilData_;
