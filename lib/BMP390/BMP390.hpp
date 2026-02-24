@@ -1,4 +1,5 @@
 #include "Adafruit_BMP3XX.h"
+#include "Config.h"
 
 // If MATHUTILS_H is not defined, define it (start of header guard)
 #ifndef BMPEXAMPLE_H
@@ -7,9 +8,8 @@
 #define BMPEXAMPLE_H
 
 void checkBMP390Connection(Adafruit_BMP3XX *bmp);
-
+bool reconnectBMP390(Adafruit_BMP3XX *bmp);
 void setupBMP(Adafruit_BMP3XX *bmp);
-
 float getAltitude(Adafruit_BMP3XX * bmp);
 
 #endif

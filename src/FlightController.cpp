@@ -186,7 +186,7 @@ void FlightController::updatePreflight() {
 }
 
 void FlightController::updateInflight() {
-  if (inflightTimer_ < kInflightUpdatePeriodMs) {
+  if (inflightTimer_ < kInflightUpdatePeriodMs) { //only updates every 30 ms
     return;
   }
   inflightTimer_ = 0;
@@ -234,7 +234,7 @@ void FlightController::updateInflight() {
     landingDetectCount_ = 0;
   }
 
-  const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs;
+  const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs; //must be in flight for at least 5 seconds
   bool landingSample = false;
   if (landingEvalArmed && altitudeValid && hasValidInflightAltitude_ && accelValid) {
     const bool altitudeStable =
@@ -277,7 +277,7 @@ void FlightController::updateLanded() {
   checkOrientationStep();
   pollLimitSwitches();
   static elapsedMillis landedLogTimer;
-  const bool upperRisingEdge = upperSwitchPressed_ && !upperSwitchLatched_;
+  const bool upperRisingEdge = upperSwitchPressed_ && !upperSwitchLatched_; // if its pressed and wasnt before
   const bool lowerRisingEdge = lowerSwitchPressed_ && !lowerSwitchLatched_;
   upperSwitchLatched_ = upperSwitchPressed_;
   lowerSwitchLatched_ = lowerSwitchPressed_;
@@ -287,9 +287,9 @@ void FlightController::updateLanded() {
     leadScrewMotor_.moveMotorBackward(kLeadScrewDutyCycle);
   }
 
-  if (upperRisingEdge && topHits_ == 0) {
+  if (upperRisingEdge && topHits_ == 0) { 
     LOG_PRINTLN(F("[FC][LANDED] upper switch active"));
-    topHits_++;
+    topHits_++; //just hit, increase hot hits
   }
 
   if (bottomHits_ == 0 && topHits_ == 1) {
@@ -300,7 +300,7 @@ void FlightController::updateLanded() {
 
   if (lowerRisingEdge && bottomHits_ == 0) {
     LOG_PRINTLN(F("[FC][LANDED] lower switch active"));
-    bottomHits_++;
+    bottomHits_++; //hit the bottom, wasnt there before, increase bottom hits
   }
 
   if (bottomHits_ == 1 && topHits_ == 1) {
@@ -308,7 +308,7 @@ void FlightController::updateLanded() {
       LOG_PRINTLN(F("[FC][LANDED] bottom reached -> stop lead screw, hold auger spin for 10s"));
       leadScrewMotor_.stopMotorWithCoast();
       leadScrewFullyExtended_ = true;
-      augerSpinActive_ = true;
+      augerSpinActive_ = true; //stop extending, keep spinning
       augerSpinTimer_ = 0;
     }
   }
@@ -459,7 +459,7 @@ void FlightController::checkOrientationStep() {
     orientMotor_.moveMotorBackward(kOrientationDutyCycle);
   }
 
-  if (orientationTimer_ >= kOrientationTimeoutMs) {
+  if (orientationTimer_ >= kOrientationTimeoutMs) { // do we think 5 seconds is enough time?
     orientMotor_.stopMotorWithCoast();
     orientationAligned_ = true;
     LOG_PRINTLN(F("[FC][LANDED][ORIENT] orientation timeout -> stopping motor"));

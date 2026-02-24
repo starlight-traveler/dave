@@ -74,7 +74,7 @@ sensors_event_t getBNO055Event(Adafruit_BNO055 *bno){
   }
 
   // Don't reconnect on every miss; check routine has timeout/backoff protection.
-  checkBNO055Connection(bno); // this will return event as well 
+  checkBNO055Connection(bno);
   return event;
 
 }

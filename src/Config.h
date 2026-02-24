@@ -77,6 +77,20 @@ constexpr uint32_t kBnoReconnectBackoffMs = 2000;             // Minimum spacing
 constexpr uint8_t kBnoStartupInitAttempts = 3;                // Number of startup initialization/reconnect attempts.
 constexpr uint32_t kBnoStartupRetryDelayMs = 50;              // Delay between BNO startup retries (milliseconds).
 
+//-------------------- ICM20649 --------------------
+constexpr uint32_t kIcmReportIntervalUs = 10000;              // all configurations are the same as the bno ones
+constexpr uint32_t kIcmNoDataReconnectMs = 1500;              
+constexpr uint32_t kIcmReconnectBackoffMs = 2000;            
+constexpr uint8_t kIcmStartupInitAttempts = 3;               
+constexpr uint32_t kIcmStartupRetryDelayMs = 50;      
+
+//-------------------- BMP390 --------------------
+constexpr uint32_t kBmpReportIntervalUs = 10000;              // all configurations are the same as the bno and icm ones
+constexpr uint32_t kBmpNoDataReconnectMs = 1500;              
+constexpr uint32_t kBmpReconnectBackoffMs = 2000;            
+constexpr uint8_t kBmpStartupInitAttempts = 3;               
+constexpr uint32_t kBmpStartupRetryDelayMs = 50;      
+
 // -------------------- Test Harness --------------------
 constexpr uint32_t kTestBnoSamplePeriodMs = 2000;             // Sample period used by BNO test sketch (milliseconds).
 constexpr uint32_t kTestMotorStepDelayMs = 5000;              // Delay between motor test steps (milliseconds).
