@@ -54,7 +54,7 @@ void FlightController::begin() {
   augerMotor_.stopMosfet();
 
   setupBMP(&bmp_);
-  LOG_PRINTLN(F("[FC] begin(): initializing BNO085"));
+  LOG_PRINTLN(F("[FC] begin(): initializing BNO055"));
   setupBNO055(&bno_);
   setupICM20649(&icm);
 
