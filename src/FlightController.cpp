@@ -37,10 +37,10 @@ float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
 /** @brief Construct controller with configured hardware. */
 FlightController::FlightController(HardwareSerial &modbus)
     : modbus_(modbus),
-      orientMotor_(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep, kOrientMotorNFault),
+      orientMotor_(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep),
       augerMotor_(gpioAuger),
       leadScrewMotor_(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep),
-      waterMotor_(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep),
+      waterMotor_(gpioWater),
       soil_(modbus_, kRs485DirPin),
       flightData_(kFlightDataRoot, kFlightDataBufferSize),
       soilData_(kSoilDataRoot, kSoilDataBufferSize) {}
@@ -329,7 +329,7 @@ void FlightController::updateLanded() {
 
   if (!leadScrewFullyExtended_ && bottomHits_ == 1 && topHits_ == 2) {
     LOG_PRINTLN(F("[FC][LANDED] drilling sequence complete -> starting water motor"));
-    waterMotor_.moveMotorForward(kWaterDutyCycle);
+    waterMotor_.moveMosfet();
   }
 
   float phReading = pH_;
@@ -371,11 +371,16 @@ void FlightController::updateLanded() {
     LOG_PRINTLN(leadScrewFullyExtended_ ? F("yes") : F("no"));
   }
 
+  if(millis() - landedStartTime_ >= kWaterTimeoutMs){
+    waterMotor_.stopMosfet();
+
+  }
+
   if (millis() - landedStartTime_ >= kLandedTimeoutMs) {
     LOG_PRINTLN(F("[FC][LANDED] landed timeout reached -> stopping all motors"));
     augerMotor_.stopMosfet();
     leadScrewMotor_.stopMotorWithCoast();
-    waterMotor_.stopMotorWithCoast();
+    waterMotor_.stopMosfet();
     orientMotor_.stopMotorWithCoast();
 
     finishSoilLogging();

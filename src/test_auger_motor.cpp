@@ -14,9 +14,7 @@ void setup() {
   LOG_PRINTLN(gpioAuger);
   augerMotor = motorDriver(gpioAuger);
   LOG_PRINTLN(F("[TEST_AUGER] setup(): ready"));
-}
 
-void loop() {
   LOG_PRINTLN(F("[TEST_AUGER] loop(): waiting 5s before ON"));
   delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_AUGER] loop(): moveMosfet() -> ON"));
@@ -24,4 +22,8 @@ void loop() {
   delay(kTestMotorStepDelayMs);
   LOG_PRINTLN(F("[TEST_AUGER] loop(): stopMosfet() -> OFF"));
   augerMotor.stopMosfet();
+}
+
+void loop() {
+
 }

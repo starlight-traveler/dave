@@ -8,7 +8,7 @@ constexpr uint32_t kSerialBaud = 9600;          // UART baud rate for debug logs
 constexpr uint32_t kMainHeartbeatMs = 1000;     // Heartbeat print period from main loop (milliseconds).
 
 // -------------------- Soil/RS-485 --------------------
-constexpr uint8_t kRs485DirPin = 4;             // RS-485 DE/RE direction control GPIO.
+constexpr uint8_t kRs485DirPin = 27;             // RS-485 DE/RE direction control GPIO.
 constexpr uint8_t kSoilSensorSlaveId = 0x01;    // Modbus slave address of the soil sensor.
 constexpr uint32_t kSoilSensorBaud = 9600;      // UART baud rate for the soil sensor bus.
 
@@ -16,20 +16,17 @@ constexpr uint32_t kSoilSensorBaud = 9600;      // UART baud rate for the soil s
 constexpr int32_t kUpperLimitSwitchPin = 2;     // Upper travel limit switch input pin (active low with pull-up).
 constexpr int32_t kLowerLimitSwitchPin = 3;     // Lower travel limit switch input pin (active low with pull-up).
 
-constexpr int32_t kOrientMotorIn1 = 27;         // Orientation motor driver IN1/PWM pin.
-constexpr int32_t kOrientMotorIn2 = 26;         // Orientation motor driver IN2/PWM pin.
-constexpr int32_t kOrientMotorSleep = 25;       // Orientation motor driver nSLEEP pin.
-constexpr int32_t kOrientMotorNFault = 24;      // Orientation motor driver nFAULT pin.
+constexpr int32_t kOrientMotorIn1 = 36;         // Orientation motor driver IN1/PWM pin.
+constexpr int32_t kOrientMotorIn2 = 37;         // Orientation motor driver IN2/PWM pin.
+constexpr int32_t kOrientMotorSleep = 38;       // Orientation motor driver nSLEEP pin.
 
-constexpr int32_t gpioAuger = 30;               // Auger MOSFET gate control pin.
+constexpr int32_t gpioAuger = 14;               // Auger motor controller PWM control pin.
 
-constexpr int32_t kLeadScrewMotorIn1 = 11;      // Lead screw motor driver IN1/PWM pin.
-constexpr int32_t kLeadScrewMotorIn2 = 12;      // Lead screw motor driver IN2/PWM pin.
+constexpr int32_t gpioWater = 10;               // Water motor controller PWM control pin.
+
+constexpr int32_t kLeadScrewMotorIn1 = 24;      // Lead screw motor driver IN1/PWM pin.
+constexpr int32_t kLeadScrewMotorIn2 = 25;      // Lead screw motor driver IN2/PWM pin.
 constexpr int32_t kLeadScrewMotorSleep = -1;    // Lead screw nSLEEP pin; -1 means not connected/unused.
-
-constexpr int32_t kWaterMotorIn1 = 9;           // Water pump motor driver IN1/PWM pin.
-constexpr int32_t kWaterMotorIn2 = 10;          // Water pump motor driver IN2/PWM pin.
-constexpr int32_t kWaterMotorSleep = -1;        // Water motor nSLEEP pin; -1 means not connected/unused.
 
 // -------------------- Flight Controller Thresholds --------------------
 constexpr float32_t kAccelThresholdSquared = 864.36f;         // Launch accel threshold (m/s^2)^2; 864.36 ~= (29.4 m/s^2)^2.
@@ -52,6 +49,7 @@ constexpr uint32_t kAugerSpinDurationMs = 10000;              // Extra auger spi
 constexpr uint32_t kOrientationTimeoutMs = 5000;              // Max orientation motor run time before forcing complete (milliseconds).
 constexpr uint32_t kSwitchPollPeriodMs = 5;                   // Limit switch polling interval (milliseconds).
 constexpr uint32_t kSensorHealthPollMs = 2000;                // Sensor connectivity/health check interval (milliseconds).
+constexpr uint32_t kWaterTimeoutMs = 50000;                   // the time water will run before stopping
 
 // -------------------- Motion Tuning --------------------
 constexpr float32_t kLeadScrewDutyCycle = 0.5f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).

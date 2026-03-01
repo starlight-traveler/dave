@@ -16,7 +16,7 @@ void setup() {
   checkBNO055Connection(&bno);
 
   LOG_PRINTLN(F("[TEST_ORIENT_BNO] setup(): creating orientation motor driver"));
-  orientationMotor = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep, kOrientMotorNFault);
+  orientationMotor = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
   LOG_PRINTLN(F("[TEST_ORIENT_BNO] setup(): ready"));
 }
 

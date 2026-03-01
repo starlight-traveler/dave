@@ -75,14 +75,6 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
     if (DRVOFF != -1) {
         pinMode(DRVOFF, OUTPUT);
     }
-
-    //in order to turn the motor with DRVOFF, the pin must be set to 0 in order for anything to run. If it is
-    // set to one, it nothing will work
-    if (DRVOFF != -1) {
-        digitalWrite(DRVOFF, LOW);
-    }
-
-
     if (nSleep != -1) {
         digitalWrite(nSLEEP, HIGH);
     }
