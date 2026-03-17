@@ -1,5 +1,6 @@
 
 #include <Arduino.h>
+#include "Constants.hpp"
 
 // int in1 = 28;
 // int in2 = 29;
@@ -18,9 +19,11 @@ namespace{
 int in1 = 24;
 int in2 = 25;
 // int sleep = 38;
-int ledPin = 13;
+int ledOuputPin = 13;
 int upperPin = 2;
 int lowerPin = 3;
+
+}
 
 void setup() {
   // put your setup code here, to run once:
@@ -29,7 +32,7 @@ void setup() {
   pinMode(in2, OUTPUT);
  // pinMode(sleep, OUTPUT);
   //pinMode(motorPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
+  pinMode(ledOuputPin, OUTPUT);
   pinMode(upperPin, INPUT_PULLUP);
   pinMode(lowerPin, INPUT_PULLUP);
 
@@ -37,9 +40,9 @@ void setup() {
   // digitalWrite(sleep, HIGH);
 
   //digitalWrite(augerPin, LOW);
-  digitalWrite(ledPin, HIGH);
+  digitalWrite(ledOuputPin, HIGH);
   delay(50);
-  digitalWrite(ledPin, LOW);
+  digitalWrite(ledOuputPin, LOW);
   delay(500);
 
 }
@@ -60,5 +63,4 @@ if(digitalRead(upperPin) == HIGH){
 
 delay(2000);
 
-}
 }

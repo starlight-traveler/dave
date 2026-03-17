@@ -47,8 +47,6 @@ HardwareSerial &modbus = Serial2;
   uint16_t launchDetectCount = 0;
   uint16_t landingDetectCount = 0;
 
-  bool hasValidInflightAltitude = false;
-
   driverSD soilData = driverSD(kSoilDataBufferSize);
 
   bool leadScrewFullyExtended = false;
@@ -108,7 +106,6 @@ void enterLandedState() {
   bottomHits  = 0;
   launchDetectCount  = 0;
   landingDetectCount  = 0;
-  hasValidInflightAltitude  = false;
   leadScrewFullyExtended  = false;
   augerSpinActive  = false;
   landedFinalized  = false;
@@ -171,8 +168,6 @@ void finishSoilLogging() {
   soilData .printSoilDataToFile(dataFile );
 }
 
-
-
 void checkSensorConnections() {
   static elapsedMillis sensorLogTimer;
   if (sensorLogTimer < kSensorHealthPollMs) {
@@ -185,6 +180,7 @@ void checkSensorConnections() {
   checkICMConnection(&icm);
 }
 
+}
 
 /*-------------------------------SETUP---------------------------------------------*/
 
@@ -364,5 +360,5 @@ void loop(){
   
   }
 
-}
+
 

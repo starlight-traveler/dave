@@ -72,14 +72,13 @@ void setupBMP(Adafruit_BMP3XX *bmp) {
 }
 
 float getAltitude(Adafruit_BMP3XX *bmp) {
-  float alt;
+  float alt = 0;
 
   if(bmp != nullptr && bmp->performReading()) {
     lastEventMsBMP = millis();
     alt = bmp->readAltitude(SEALEVELPRESSURE_HPA);
      
   }
-  
   checkBMP390Connection(bmp);
   return alt;
 }

@@ -1,5 +1,6 @@
 #include <Arduino.h>
-namespace{
+#include "Constants.hpp"
+
 void setup(){
     Serial.begin(9600);
 }
@@ -7,6 +8,4 @@ void setup(){
 void loop(){
     Serial.println("Loop running...");
     delay(2000);
-}
-
 }
