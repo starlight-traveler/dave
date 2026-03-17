@@ -9,102 +9,115 @@
 #include "driverSD.hpp"
 #include "motorDriver.hpp"
 #include "SoilSensor.hpp"
-
 #include "Constants.hpp"
 
+//for coomunication with soil sensor
 #define RS485_DIR_PIN 27
 #define SLAVE_ID 0x01
 
 HardwareSerial &modbus = Serial2;
 
+//defining states
   enum FlightState {
     PREFLIGHT,
     INFLIGHT,
     LANDED,
   };
 
+//creating motor objects
   motorDriver orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
   motorDriver augerMotor = motorDriver(gpioAuger);
   motorDriver leadScrewMotor  = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
   motorDriver waterMotor  = motorDriver(gpioWater);
 
+//creating sensor objects
   Adafruit_BMP3XX bmp;
   Adafruit_BNO055  bno =  Adafruit_BNO055(55, 0x28);
   Adafruit_ICM20649 icm;
 
+//data file objeect for storing data in sd card
   File dataFile;
 
-  FlightState state = PREFLIGHT;
+  FlightState state = PREFLIGHT; //initializng state
   FlightState lastLoggedstate = PREFLIGHT;
   bool hasLoggedInitialstate = false;
+
+//initalizing time markers
   float inflightStartTime  = 0;
   float landedStartTime  = 0;
   float waterMotorStartTime = 0;
 
-
+//varaibles to hold fetched soil sensor data
   float32_t nitrogenMgKg = 0.0f;
   float32_t pH = 0.0f;
   float32_t electricalConductivity = 0.0f;
 
-  int32_t topHits = 0;
-  int32_t bottomHits = 0;
-  uint16_t launchDetectCount = 0;
-  uint16_t landingDetectCount = 0;
+
+  int32_t topHits = 0; //amount of times the top limit switch is hit
+  int32_t bottomHits = 0; // amount of times the bottom limit switch is hit
+
+  uint16_t launchDetectCount = 0; // amount of times the liftoff threshold has been met, must has valid and high enoough accel from both sensors to count. Must have 5 consecutive samples
+  uint16_t landingDetectCount = 0; // amount of times the landing threshold has been met, must have low accel and low change in altitude to count. Must have 5 consecutive samples
 
   float32_t currentAltitude = 0.0f;
   float32_t previousAltitude = 0.0f;
   bool hasValidInflightAltitude = false;
 
-  driverSD flightData = driverSD(kFlightDataBufferSize);
-  driverSD soilData = driverSD(kSoilDataBufferSize);
+  driverSD flightData = driverSD(kFlightDataBufferSize); //creating flight data object with correct buffer size (8), to store needed data
+  driverSD soilData = driverSD(kSoilDataBufferSize); //creating soil data object w correct buffer size. 
 
+//motor driver logic booleans
   bool leadScrewFullyExtended = false;
   bool augerSpinActive = false;
-  bool orientationAligned = false;
   bool landedFinalized = false;
   
+//limit switch logic booleans
   bool upperSwitchPressed = false;
   bool lowerSwitchPressed = false;
   bool lastUpperSwitchPressed = false;
   bool lastLowerSwitchPressed = false;
   bool upperStateChange = false;
   bool lowerStateChange = false;
-
   bool isMovingUp = false;
+  bool waterDispensed = false; //will be true once water dipenses once
+  bool waterGone = false; // will be true after
 
-  bool waterDispensed = false;
-  bool waterGone = false;
 
+//timers for state change tracking
   elapsedMillis preflightTimer;
   elapsedMillis preflightStateTimer;
   elapsedMillis inflightTimer;
   elapsedMillis augerSpinTimer;
-  elapsedMillis orientationTimer;
   elapsedMillis soilTimer;
 
 /*-------------------------FUNCTIONS-------------------------------------*/
 
-float32_t absScalarF32(float32_t value) {
-  float32_t src[1] = {value};
+/*This function will return the absolute value of val*/
+float32_t absScalarF32(float32_t val) {
+  float32_t src[1] = {val};
   float32_t dst[1] = {0.0f};
   arm_abs_f32(src, dst, 1);
   return dst[0];
 }
 
+/*This function will return true if the acceleration value inputted is finite and the absolute value is under 1500 m/s^2*/
 bool isFiniteAndReasonable(float32_t value) {
   return __builtin_isfinite(value) && absScalarF32(value) <= kAccelSanityMaxAbsMs2;
 }
 
+/*This function will return true if the acceleration componants inputted are all finite and reasonable*/
 bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
   return isFiniteAndReasonable(x) && isFiniteAndReasonable(y) && isFiniteAndReasonable(z);
 }
 
+/*This function will return true if the altitude passed is finite, greater tahn -500 and less than 100,000 m*/
 bool altitudeIsSane(float32_t altitudeM) {
   return __builtin_isfinite(altitudeM) &&
          altitudeM >= kAltitudeValidMinM &&
          altitudeM <= kAltitudeValidMaxM;
 }
 
+/*This funcntion will return the magnitude squared of a 3d vector*/
 float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
   float32_t vec[3] = {x, y, z};
   float32_t magnitudeSquared = 0.0f;
@@ -112,13 +125,10 @@ float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
   return magnitudeSquared;
 }
 
-
+/*This function will reset all vairables needed when entering the landed state, as well as log the landed state start time*/
 void enterLandedState() {
   state = LANDED;
   landedStartTime  = millis();
-  orientationAligned  = false;
-  orientationTimer  = 0;
-
 
   upperSwitchPressed = false;
   lowerSwitchPressed = false;
@@ -135,114 +145,96 @@ void enterLandedState() {
   leadScrewFullyExtended  = false;
   augerSpinActive  = false;
   landedFinalized  = false;
+
 }
 
-
+/*This function will check the orientation of the nosecone and turn the nosecone accordingly if not aligned. */
 void checkOrientationStep() {
-  if (orientationAligned ) {
-    return;
-  }
+  //getting the gravity vector from bno
+    const imu::Vector<3> gravity =  bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+    const float32_t gravityX = gravity.x();
+    const float32_t gravityY = gravity.y();
+    const float32_t gravityZ = gravity.z();
 
-  const imu::Vector<3> gravity =  bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
-  const float32_t gravityX = gravity.x();
-  const float32_t gravityY = gravity.y();
-  const float32_t gravityZ = gravity.z();
+ //if the gravity vector inputted is not same, then start a timer to log how long the program has gone wihtout valid gravity data.
   if (!accelVectorIsSane(gravityX, gravityY, gravityZ)) {
     static elapsedMillis invalidGravityLogTimer;
+    //only prints out message every 500 ms so not bombarded with error messages
     if (invalidGravityLogTimer >= kOrientationLogPeriodMs) {
       invalidGravityLogTimer = 0;
-      Serial.println("[FC][LANDED][ORIENT] gravity invalid, skipping orientation step");
+      Serial.println("[LANDED][ORIENT] gravity invalid, skipping orientation step");
     }
+    //if not valid, stopping motor and returning to main program
     orientMotor.stopMotorWithCoast();
     return;
   }
 
-  static elapsedMillis orientLogTimer;
-  if (orientLogTimer >= kOrientationLogPeriodMs) {
-    orientLogTimer = 0;
-
-  }
-
-  if (gravityY <= kOrientationAlignedYMax &&
-     gravityY >= kOrientationAlignedYMin) {
+  //if the y axis is within the needed range, stopping the motor and setting the orientMotor to true as it was aligned properly and returning to main program
+  if (gravityY <= kOrientationAlignedYMax && gravityY >= kOrientationAlignedYMin) {
     orientMotor.stopMotorWithCoast();
-    orientationAligned  = true;
-    Serial.println("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete");
+    Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
-  }
-
-  if (orientationTimer  >= kOrientationTimeoutMs) { // do we think 5 seconds is enough time?
-    orientMotor .stopMotorWithCoast();
-    orientationAligned  = true;
-    Serial.println("[FC][LANDED][ORIENT] orientation timeout -> stopping motor");
   }
 }
 
+/*This function will start or restart the flight logging if the current index of the buffer is zero. It will set the datafile in SD card to the current file
+name of the flight log file.*/
 void startFlightLoggingIfNeeded() {
   if (flightData.getCurrentIndex() == 0) {
-    Serial.print("[FC][INFLIGHT] opening flight log file: ");
-    Serial.print(flightData .getCurrentFileName());
-    dataFile  = SD.open(flightData .getCurrentFileName(), FILE_WRITE);
-    Serial.print(dataFile  ? F("[FC][INFLIGHT] file open OK") : F("[FC][INFLIGHT] file open FAILED"));
+    Serial.print("[INFLIGHT] opening flight log file: ");
+    dataFile = SD.open(flightData .getCurrentFileName(), FILE_WRITE);
+    Serial.print(dataFile  ? F("[INFLIGHT] file open OK") : F("[INFLIGHT] file open FAILED"));
   }
 }
 
+/*This function will start or restart the soil logging if the current index of the buffer is zero. It will set the SD datafile to soil log name.*/
 void startSoilLoggingIfNeeded() {
   if (soilData .getCurrentIndex() == 0) {
-    Serial.print("[FC][LANDED] opening soil log file: ");
-    Serial.print(soilData .getCurrentFileName());
+    Serial.print("[LANDED] opening soil log file: ");
     dataFile  = SD.open(soilData .getCurrentFileName(), FILE_WRITE);
-    Serial.print(dataFile  ? F("[FC][LANDED] file open OK") : F("[FC][LANDED] file open FAILED"));
+    Serial.print(dataFile  ? F("[LANDED] file open OK") : F("[LANDED] file open FAILED"));
   }
 }
 
+/*This function will print flight data to the SD card, no matter if the buffer is full or not because there is a state change to landed */
 void finishFlightLogging() {
-  Serial.print("[FC][INFLIGHT] finalizing flight log");
+  Serial.print("[INFLIGHT] finalizing flight log");
   flightData.increaseCurrentIndexBy(-1);
-  flightData.printFlightDataToFile(dataFile );
+  flightData.printFlightDataToFile(dataFile);
 }
 
+/*This fucntion will print the soil data to SD, no matter if the buffer is full or not because the program is done running.*/
 void finishSoilLogging() {
   Serial.print("[FC][LANDED] finalizing soil log");
   soilData.increaseCurrentIndexBy(-1);
   soilData.printSoilDataToFile(dataFile );
 }
 
-
-
+/*This function checks if all the sensors are properly communicating iwht the teensy, does not return anything, just performs connection checks*/
 void checkSensorConnections() {
+  //if this function was run less than 2 seconds ago, just returning because there is no need to check more than every 2 seconds.
   static elapsedMillis sensorLogTimer;
   if (sensorLogTimer < kSensorHealthPollMs) {
     return;
   }
   sensorLogTimer = 0;
-  Serial.print("[FC] checkSensorConnections(): polling BNO health");
+
+  //checking connections
   checkBNO055Connection(&bno);
   checkBMP390Connection(&bmp );
   checkICMConnection(&icm);
 }
 
-
-String stateName(FlightState state) {
-  switch (state) {
-    case PREFLIGHT:
-      return "PREFLIGHT";
-    case INFLIGHT:
-      return "INFLIGHT";
-    case LANDED:
-      return "LANDED";
-    default:
-      return "UNKNOWN";
-  }
-}
-
-
 /*-------------------------------SETUP---------------------------------------------*/
 
 void setup(){
+  //set up serial
   Serial.begin(9600);
 
+  //set up modbus for soil sensor
   modbus.begin(9600, SERIAL_8N1);
+
+  //configure rs485 pin and initialze to low
   pinMode(RS485_DIR_PIN, OUTPUT);
   digitalWrite(RS485_DIR_PIN, LOW);
 
@@ -252,6 +244,7 @@ void setup(){
   //starting ledpin
   pinMode(ledPin, OUTPUT);
 
+  //intializing the motors inside the setup
   orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
   augerMotor  = motorDriver(gpioAuger);
   leadScrewMotor = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
@@ -261,13 +254,16 @@ void setup(){
   augerMotor.stopMosfet();
   waterMotor.stopMosfet();
 
+  //setup the sensors
   setupBMP(&bmp);
   setupBNO055(&bno);
   setupICM20649(&icm);
   
+  //set up the limnit switches as input pullup
   pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
   pinMode(kLowerLimitSwitchPin, INPUT_PULLUP);
 
+  //begin the sd card, shining led light if cannot find or connect to
   if (!SD.begin(BUILTIN_SDCARD)) {
   Serial.println("SD mount failed, halting and outputting light");
   while (1) {
@@ -275,47 +271,52 @@ void setup(){
   }
   }
 
-  preflightStateTimer  = 0;
-
+  //setting up the file names for the flight data and soil data so can be logged properly
   flightData.begin(kFlightDataRoot);
   soilData.begin(kSoilDataRoot);
+
+  //starting the preflight state timer so it can accumulate in loop
+  preflightStateTimer  = 0;
 
 }
 
 
 /*------------------------------------------------- LOOP -----------------------------------------------------------*/
-
 void loop(){
+  //checking sensor connections
   checkSensorConnections();
+
+
+
+
+
+
   switch (state){
+    //only update and go thorugh the preflight loop every 50 ms
     case(PREFLIGHT): {
       if (preflightTimer  < kPreflightUpdatePeriodMs) {
       return;
     }
 
+    //getting ICM acceleration and checking if it sane, if so, getting it squared for comparison to threshold
     sensors_event_t accelICM = getICM20649Accel(&icm);
+    const bool icmAccelSane = accelVectorIsSane(accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z);
+    const float32_t accelICMSquared = icmAccelSane ? squaredMagnitude(accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z) : 0.0f; //if not sane, it will equal zero as to not change states
 
-    const bool icmAccelSane = accelVectorIsSane(
-        accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z);
-        
-    const float32_t accelICMSquared = icmAccelSane
-        ? squaredMagnitude(accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z)
-        : 0.0f;
+    //getting BNO acceleration and checking if it sane, if so, getting it squared for comparison to threshold
+    sensors_event_t bnoAccel = getBNO055Event(&bno);
+    const bool bnoAccelSane = accelVectorIsSane(bnoAccel.acceleration.x,bnoAccel.acceleration.x, bnoAccel.acceleration.x);
+    const float32_t accelBNOSquared = bnoAccelSane ? squaredMagnitude(bnoAccel.acceleration.x,bnoAccel.acceleration.x, bnoAccel.acceleration.x) : 0.0f;
 
-    imu::Vector<3> bnoLinearAccel =  bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
-    const bool bnoAccelSane = accelVectorIsSane(
-        bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z());
-    const float32_t accelBNOSquared = bnoAccelSane
-        ? squaredMagnitude(bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z())
-        : 0.0f;
-
-    const float32_t currentAlt = getAltitude(&bmp ); //getting current altitude
+    //getting the current altitude from BMP, checking if sane.
+    const float32_t currentAlt = getAltitude(&bmp);
     const bool altitudeValid = altitudeIsSane(currentAlt);
-    const bool launchSample = icmAccelSane && bnoAccelSane &&
-                              accelICMSquared > kAccelThresholdSquared &&
-                              accelBNOSquared > kAccelThresholdSquared;
 
+    //launch sample will return true if all values gotten are same and within thresholds to count towards launch, and false if not
+    //both accels must be above 4gs
+    const bool launchSample = icmAccelSane && bnoAccelSane && accelICMSquared > kAccelThresholdSquared && accelBNOSquared > kAccelThresholdSquared;
 
+    //if the launch sample is true, increaeing the detection, which counts how many consectutive times it is true. If not true, consectuve counts goes back to zero.
     if (launchSample) {
       if (launchDetectCount  < kLaunchDetectConsecutiveSamples) {
         launchDetectCount ++;
@@ -324,21 +325,22 @@ void loop(){
       launchDetectCount  = 0;
     }
 
+    //if the consective samples reach the needed amount, changing state to INFLIGHT
     if (launchDetectCount  >= kLaunchDetectConsecutiveSamples) {
       state = INFLIGHT;
-      inflightStartTime  = millis();
-      landingDetectCount  = 0;
+      inflightStartTime  = millis(); //saving inflight start time
+      landingDetectCount  = 0; 
+      //if the altitude is valid, saving it as both current and past altitude so change can start to be tracked
       if (altitudeValid) {
           previousAltitude  = currentAlt;
           currentAltitude  = currentAlt;
           hasValidInflightAltitude  = true;
+      //if not initializng both to 0
         } else {
           previousAltitude  = 0.0f;
           currentAltitude  = 0.0f;
           hasValidInflightAltitude  = false;
         }
-      launchDetectCount  = 0;
-      preflightStateTimer  = 0;
       return;
     }
   break;
@@ -353,59 +355,77 @@ void loop(){
     return;
     }
 
-  const uint32_t timeDiffInFlight = millis() - inflightStartTime ;
+  const uint32_t timeDiffInFlight = millis() - inflightStartTime ; //getting the current time in flight
 
+  //getting all sensor events needed for logging
   sensors_event_t accel = getICM20649Accel(&icm);
   sensors_event_t orient = getBNO055Event(& bno);
   const float32_t altitude = getAltitude(&bmp );
+
+  //checking if sensor values are sane
   const bool altitudeValid = altitudeIsSane(altitude);
+  const bool accelValid = accelVectorIsSane(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
 
+  //getting accel squared if valid
+  const float32_t accelSquared = accelValid ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z) : 0.0f;
 
-  const bool accelValid = accelVectorIsSane(
-      accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
-  const float32_t accelSquared = accelValid
-      ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z)
-      : 0.0f;
-
+  //starting the logging again if needed (index == 0)
   startFlightLoggingIfNeeded();
 
 
+  //adding data to the flighData buffer to be stored in sd card
   flightData.addFlightData(accel, orient, altitude, dataFile );
 
+  //if the current alt is valid and wasnt before, setting both current and past to the current alt, then setting has valid alt to true
   if (altitudeValid) {
     if (!hasValidInflightAltitude ) {
       previousAltitude  = altitude;
       currentAltitude  = altitude;
       hasValidInflightAltitude  = true;
+  //if it valid and has had previuos valid alt, just saving current alt to current
     } else {
       currentAltitude  = altitude;
+    }
+  //threshold of consectuve counts cant be met if alt isnt valid
+  } else {
+    landingDetectCount  = 0;
+  }
+
+  //must be in flight for at least 5 seconds, this will be true after 5 seconds of inflight state
+  const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs;
+
+  //resetting landing sample to false
+  bool landingSample = false;
+
+  //if after 5 seconds, there is valid alt and accel, seeing if 
+  if (landingEvalArmed && altitudeValid && hasValidInflightAltitude  && accelValid) {
+    //will be true if the difference in altitude is less than 0.5 meters (falling slowly)
+    const bool altLessThanHalfM = absScalarF32(currentAltitude  - previousAltitude ) <= kLandingAltitudeDeltaThresholdM;
+
+    //will be true is accel is less than 4
+    const bool lowAccel = accelSquared <= kLandingAccelThresholdSquared;
+
+    //will be true is accel is less than 4 and delta alt is less than 0.5
+    landingSample = altLessThanHalfM && lowAccel;
+  }
+
+  //if valid sample, and not yet at threshold, increasing consective samples. If not valid, resetting detection count
+  if (landingSample) {
+    if (landingDetectCount  < kLandingDetectConsecutiveSamples) {
+      landingDetectCount ++;
     }
   } else {
     landingDetectCount  = 0;
   }
 
-  const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs; //must be in flight for at least 5 seconds
-  bool landingSample = false;
-  if (landingEvalArmed && altitudeValid && hasValidInflightAltitude  && accelValid) {
-    const bool altitudeStable =
-        absScalarF32(currentAltitude  - previousAltitude ) <= kLandingAltitudeDeltaThresholdM;
-    const bool lowAccel = accelSquared <= kLandingAccelThresholdSquared;
-    landingSample = altitudeStable && lowAccel;
-  }
-
-  if (landingSample) {
-    if (landingDetectCount  < kLandingDetectConsecutiveSamples) {
-      landingDetectCount ++;
-    }
-  } else if (landingEvalArmed) {
-    landingDetectCount  = 0;
-  }
-
+  //if after five seconds and the detection count gets to five, finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
   if (landingEvalArmed && landingDetectCount  >= kLandingDetectConsecutiveSamples) {
     finishFlightLogging();
     enterLandedState();
+    topHits  = 1;
     return;
 
+  //if been in inflight for 3 mintutes finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
   if (timeDiffInFlight > kInflightTimeoutMs) {
     finishFlightLogging();
     enterLandedState();
@@ -413,12 +433,16 @@ void loop(){
     return;
   }
 
-    if (altitudeValid && hasValidInflightAltitude ) {
+  //saving current alt for next loop's last alt
+  if (altitudeValid && hasValidInflightAltitude ) {
       previousAltitude  = currentAltitude ;
     }
   }
   break;
   }
+
+
+
 
 
 
@@ -556,6 +580,10 @@ void loop(){
   
   break;
   }
+
+
+
+
 
   default:
   return;

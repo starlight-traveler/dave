@@ -24,6 +24,8 @@ HardwareSerial &modbus = Serial2;
     LANDED,
   };
 
+  const char* landedTestSoilRoot = "LandedTestingSoil";
+
   motorDriver orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
   motorDriver augerMotor = motorDriver(gpioAuger);
   motorDriver leadScrewMotor  = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
@@ -193,7 +195,6 @@ void setup(){
 
   Serial.println("Soil sensor Modbus reader started");
 
-  
   //starting ledpin
   pinMode(ledPin, OUTPUT);
 
@@ -220,7 +221,7 @@ void setup(){
   }
   }
 
-  soilData.begin(kSoilDataRoot);
+  soilData.begin(landedTestSoilRoot);
 
 }
 
