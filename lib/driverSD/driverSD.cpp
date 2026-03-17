@@ -26,10 +26,14 @@ void writeRow(File &dataFile, float32_t *row, int numCols) {
 }
 }  // namespace
 
-driverSD::driverSD(const char* fileRoot, int numOfColumns){
-    findCurrentFileName(fileRoot);
+driverSD::driverSD(int numOfColumns){
     numBufferCol = numOfColumns;
     memset(dataBuffer, 0, sizeof(dataBuffer));
+}
+
+// Add this new method
+void driverSD::begin(const char* fileRoot) {
+    findCurrentFileName(fileRoot);
 }
 
 //accessers
@@ -55,15 +59,14 @@ void driverSD::increaseCurrentIndexBy(int increment){
 //iteration to be something different to not override.
 
 void driverSD::findCurrentFileName(String fileRoot){
-    const String baseRoot = fileRoot;
     //intially setting file number to zero
     int fileNumber = 0;
-    String candidate = baseRoot + ".txt";
+    String candidate = fileRoot + String(fileNumber) + ".txt";
 
     //going through the SD card, checking if the file name exists. If it does, incrementing the file number and try again
     while (SD.exists(candidate.c_str())){
         fileNumber++;
-        candidate = baseRoot + String(fileNumber) + ".txt";
+        candidate = fileRoot + String(fileNumber) + ".txt";
     }
 
     fileName = candidate;

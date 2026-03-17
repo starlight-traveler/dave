@@ -1,5 +1,4 @@
 #include "Adafruit_BMP3XX.h"
-#include "Config.h"
 
 // If MATHUTILS_H is not defined, define it (start of header guard)
 #ifndef BMPEXAMPLE_H

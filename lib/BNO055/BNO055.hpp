@@ -2,7 +2,6 @@
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BNO055.h>
 #include <utility/imumaths.h>
-#include "Config.h"
 
 #ifndef BNO055_HPP
 #define BNO055_HPP

@@ -90,43 +90,28 @@ void motorDriver::stopMosfet(){
 
 //this function will cause the motor to move forward
 void motorDriver::moveMotorForward(float dutyCycle) {
-    if(drvControlOn==false){
     analogWrite(IN1, dutyToPwm(dutyCycle)); //it seems like high is the same as 1 or true
     analogWrite(IN2, 0);   //low is the same as 0 or false
-    }
 }
 
 //this function will cause the motor to move backward
 void motorDriver::moveMotorBackward(float dutyCycle) {
-    if(drvControlOn==false){
     analogWrite(IN1, 0);
     analogWrite(IN2, dutyToPwm(dutyCycle));
-    }
 
 }
 
 //this function will stop the motor
 void motorDriver::stopMotorWithCoast() {
-    if(drvControlOn==false){
     analogWrite(IN1, 0);
     analogWrite(IN2, 0);
-    }
 }
 
-//this function will get the status of the nFault pin (if the motor has it), and will return true if the nFault pin has returned low 
-// voltage (indecating) something is wrong, and false if the pin returns high voltage, which indicates everything is alright
-bool motorDriver::nFaultPulledLow(){
-    if (drvControlOn == true || nFault == -1) {
-        return false;
-    }
-    return digitalRead(nFault) == LOW;
-}
-
-//this method will check to see if the nFault pin is true (which means something is wrong with the motor), and if so
-//turning the DRVOFF pin on high so it stops working overall
-void motorDriver::turnOnDRVOFF(){
-    if(DRVOFF != -1 && nFaultPulledLow()==true){
-        digitalWrite(DRVOFF, HIGH);
-        drvControlOn = true;
-    }
-}
+// //this function will get the status of the nFault pin (if the motor has it), and will return true if the nFault pin has returned low 
+// // voltage (indecating) something is wrong, and false if the pin returns high voltage, which indicates everything is alright
+// bool motorDriver::nFaultPulledLow(){
+//     if (drvControlOn == true || nFault == -1) {
+//         return false;
+//     }
+//     return digitalRead(nFault) == LOW;
+// }

@@ -15,9 +15,10 @@ class driverSD {
 
     public:
         //constructor
-        driverSD(const char* fileRoot, int numOfColumns);
+        driverSD(int numOfColumns);
         
         //other functions
+        void begin(const char* fileRoot);
         void findCurrentFileName(String fileRoot);
         const char* getCurrentFileName();
         int getCurrentIndex();

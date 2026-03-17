@@ -2,7 +2,6 @@
 #include <Wire.h>
 #include <Adafruit_ICM20X.h>
 #include <Adafruit_ICM20649.h>
-#include "Config.h"
 
 #ifndef MATHUTILS_H
 #ifndef ICM20649_H

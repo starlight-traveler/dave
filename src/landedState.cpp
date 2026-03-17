@@ -9,8 +9,9 @@
 #include "driverSD.hpp"
 #include "motorDriver.hpp"
 #include "SoilSensor.hpp"
-
 #include "Constants.hpp"
+
+namespace{
 
 #define RS485_DIR_PIN 27
 #define SLAVE_ID 0x01
@@ -34,13 +35,8 @@ HardwareSerial &modbus = Serial2;
 
   File dataFile;
 
-  FlightState state = PREFLIGHT;
-  FlightState lastLoggedstate = PREFLIGHT;
-  bool hasLoggedInitialstate = false;
-  float inflightStartTime  = 0;
   float landedStartTime  = 0;
   float waterMotorStartTime = 0;
-
 
   float32_t nitrogenMgKg = 0.0f;
   float32_t pH = 0.0f;
@@ -51,11 +47,8 @@ HardwareSerial &modbus = Serial2;
   uint16_t launchDetectCount = 0;
   uint16_t landingDetectCount = 0;
 
-  float32_t currentAltitude = 0.0f;
-  float32_t previousAltitude = 0.0f;
   bool hasValidInflightAltitude = false;
 
-  driverSD flightData = driverSD(kFlightDataBufferSize);
   driverSD soilData = driverSD(kSoilDataBufferSize);
 
   bool leadScrewFullyExtended = false;
@@ -83,7 +76,6 @@ HardwareSerial &modbus = Serial2;
   elapsedMillis soilTimer;
 
 /*-------------------------FUNCTIONS-------------------------------------*/
-
 float32_t absScalarF32(float32_t value) {
   float32_t src[1] = {value};
   float32_t dst[1] = {0.0f};
@@ -99,22 +91,7 @@ bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
   return isFiniteAndReasonable(x) && isFiniteAndReasonable(y) && isFiniteAndReasonable(z);
 }
 
-bool altitudeIsSane(float32_t altitudeM) {
-  return __builtin_isfinite(altitudeM) &&
-         altitudeM >= kAltitudeValidMinM &&
-         altitudeM <= kAltitudeValidMaxM;
-}
-
-float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
-  float32_t vec[3] = {x, y, z};
-  float32_t magnitudeSquared = 0.0f;
-  arm_dot_prod_f32(vec, vec, 3, &magnitudeSquared);
-  return magnitudeSquared;
-}
-
-
 void enterLandedState() {
-  state = LANDED;
   landedStartTime  = millis();
   orientationAligned  = false;
   orientationTimer  = 0;
@@ -153,7 +130,7 @@ void checkOrientationStep() {
       invalidGravityLogTimer = 0;
       Serial.println("[FC][LANDED][ORIENT] gravity invalid, skipping orientation step");
     }
-    orientMotor.stopMotorWithCoast();
+    orientMotor .stopMotorWithCoast();
     return;
   }
 
@@ -165,7 +142,7 @@ void checkOrientationStep() {
 
   if (gravityY <= kOrientationAlignedYMax &&
      gravityY >= kOrientationAlignedYMin) {
-    orientMotor.stopMotorWithCoast();
+    orientMotor .stopMotorWithCoast();
     orientationAligned  = true;
     Serial.println("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete");
     return;
@@ -178,15 +155,6 @@ void checkOrientationStep() {
   }
 }
 
-void startFlightLoggingIfNeeded() {
-  if (flightData.getCurrentIndex() == 0) {
-    Serial.print("[FC][INFLIGHT] opening flight log file: ");
-    Serial.print(flightData .getCurrentFileName());
-    dataFile  = SD.open(flightData .getCurrentFileName(), FILE_WRITE);
-    Serial.print(dataFile  ? F("[FC][INFLIGHT] file open OK") : F("[FC][INFLIGHT] file open FAILED"));
-  }
-}
-
 void startSoilLoggingIfNeeded() {
   if (soilData .getCurrentIndex() == 0) {
     Serial.print("[FC][LANDED] opening soil log file: ");
@@ -196,16 +164,11 @@ void startSoilLoggingIfNeeded() {
   }
 }
 
-void finishFlightLogging() {
-  Serial.print("[FC][INFLIGHT] finalizing flight log");
-  flightData.increaseCurrentIndexBy(-1);
-  flightData.printFlightDataToFile(dataFile );
-}
 
 void finishSoilLogging() {
   Serial.print("[FC][LANDED] finalizing soil log");
-  soilData.increaseCurrentIndexBy(-1);
-  soilData.printSoilDataToFile(dataFile );
+  soilData .increaseCurrentIndexBy(-1);
+  soilData .printSoilDataToFile(dataFile );
 }
 
 
@@ -217,23 +180,9 @@ void checkSensorConnections() {
   }
   sensorLogTimer = 0;
   Serial.print("[FC] checkSensorConnections(): polling BNO health");
-  checkBNO055Connection(&bno);
+  checkBNO055Connection(& bno);
   checkBMP390Connection(&bmp );
   checkICMConnection(&icm);
-}
-
-
-String stateName(FlightState state) {
-  switch (state) {
-    case PREFLIGHT:
-      return "PREFLIGHT";
-    case INFLIGHT:
-      return "INFLIGHT";
-    case LANDED:
-      return "LANDED";
-    default:
-      return "UNKNOWN";
-  }
 }
 
 
@@ -261,8 +210,8 @@ void setup(){
   augerMotor.stopMosfet();
   waterMotor.stopMosfet();
 
-  setupBMP(&bmp);
-  setupBNO055(&bno);
+  setupBMP(&bmp );
+  setupBNO055(&bno );
   setupICM20649(&icm);
   
   pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
@@ -275,9 +224,6 @@ void setup(){
   }
   }
 
-  preflightStateTimer  = 0;
-
-  flightData.begin(kFlightDataRoot);
   soilData.begin(kSoilDataRoot);
 
 }
@@ -286,144 +232,9 @@ void setup(){
 /*------------------------------------------------- LOOP -----------------------------------------------------------*/
 
 void loop(){
-  checkSensorConnections();
-  switch (state){
-    case(PREFLIGHT): {
-      if (preflightTimer  < kPreflightUpdatePeriodMs) {
-      return;
-    }
-
-    sensors_event_t accelICM = getICM20649Accel(&icm);
-
-    const bool icmAccelSane = accelVectorIsSane(
-        accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z);
-        
-    const float32_t accelICMSquared = icmAccelSane
-        ? squaredMagnitude(accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z)
-        : 0.0f;
-
-    imu::Vector<3> bnoLinearAccel =  bno.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
-    const bool bnoAccelSane = accelVectorIsSane(
-        bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z());
-    const float32_t accelBNOSquared = bnoAccelSane
-        ? squaredMagnitude(bnoLinearAccel.x(), bnoLinearAccel.y(), bnoLinearAccel.z())
-        : 0.0f;
-
-    const float32_t currentAlt = getAltitude(&bmp ); //getting current altitude
-    const bool altitudeValid = altitudeIsSane(currentAlt);
-    const bool launchSample = icmAccelSane && bnoAccelSane &&
-                              accelICMSquared > kAccelThresholdSquared &&
-                              accelBNOSquared > kAccelThresholdSquared;
-
-
-    if (launchSample) {
-      if (launchDetectCount  < kLaunchDetectConsecutiveSamples) {
-        launchDetectCount ++;
-      }
-    } else {
-      launchDetectCount  = 0;
-    }
-
-    if (launchDetectCount  >= kLaunchDetectConsecutiveSamples) {
-      state = INFLIGHT;
-      inflightStartTime  = millis();
-      landingDetectCount  = 0;
-      if (altitudeValid) {
-          previousAltitude  = currentAlt;
-          currentAltitude  = currentAlt;
-          hasValidInflightAltitude  = true;
-        } else {
-          previousAltitude  = 0.0f;
-          currentAltitude  = 0.0f;
-          hasValidInflightAltitude  = false;
-        }
-      launchDetectCount  = 0;
-      preflightStateTimer  = 0;
-      return;
-    }
-  break;
-  }
-
-
-
-
-
-  case (INFLIGHT): {
-    if (inflightTimer  < kInflightUpdatePeriodMs) { //only updates every 30 ms
-    return;
-    }
-
-  const uint32_t timeDiffInFlight = millis() - inflightStartTime ;
-
-  sensors_event_t accel = getICM20649Accel(&icm);
-  sensors_event_t orient = getBNO055Event(& bno);
-  const float32_t altitude = getAltitude(&bmp );
-  const bool altitudeValid = altitudeIsSane(altitude);
-
-
-  const bool accelValid = accelVectorIsSane(
-      accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
-  const float32_t accelSquared = accelValid
-      ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z)
-      : 0.0f;
-
-  startFlightLoggingIfNeeded();
-
-
-  flightData.addFlightData(accel, orient, altitude, dataFile );
-
-  if (altitudeValid) {
-    if (!hasValidInflightAltitude ) {
-      previousAltitude  = altitude;
-      currentAltitude  = altitude;
-      hasValidInflightAltitude  = true;
-    } else {
-      currentAltitude  = altitude;
-    }
-  } else {
-    landingDetectCount  = 0;
-  }
-
-  const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs; //must be in flight for at least 5 seconds
-  bool landingSample = false;
-  if (landingEvalArmed && altitudeValid && hasValidInflightAltitude  && accelValid) {
-    const bool altitudeStable =
-        absScalarF32(currentAltitude  - previousAltitude ) <= kLandingAltitudeDeltaThresholdM;
-    const bool lowAccel = accelSquared <= kLandingAccelThresholdSquared;
-    landingSample = altitudeStable && lowAccel;
-  }
-
-  if (landingSample) {
-    if (landingDetectCount  < kLandingDetectConsecutiveSamples) {
-      landingDetectCount ++;
-    }
-  } else if (landingEvalArmed) {
-    landingDetectCount  = 0;
-  }
-
-  if (landingEvalArmed && landingDetectCount  >= kLandingDetectConsecutiveSamples) {
-    finishFlightLogging();
     enterLandedState();
-    return;
+    checkSensorConnections();
 
-  if (timeDiffInFlight > kInflightTimeoutMs) {
-    finishFlightLogging();
-    enterLandedState();
-    topHits  = 1;
-    return;
-  }
-
-    if (altitudeValid && hasValidInflightAltitude ) {
-      previousAltitude  = currentAltitude ;
-    }
-  }
-  break;
-  }
-
-
-
-
-  case (LANDED): {
     if (landedFinalized ) {
       return;
     }
@@ -445,7 +256,6 @@ void loop(){
 
     static elapsedMillis landedLogTimer;
 
-    
     if (upperStateChange && topHits  == 0) { 
       Serial.println("upper switch pressed");
       leadScrewMotor.stopMotorWithCoast();
@@ -550,16 +360,8 @@ void loop(){
       Serial.println("cycle complete, resetting counters to start the process again (no water pump this time)");
       enterLandedState();
     }
-
-    state = LANDED;
     delay(2000);
   
-  break;
-  }
-
-  default:
-  return;
-
   }
 
 }
