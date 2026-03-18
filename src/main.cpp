@@ -68,7 +68,7 @@ HardwareSerial &modbus = Serial2;
 
 //motor driver logic booleans
   bool leadScrewFullyExtended = false;
-  bool augerSpinActive = false;
+  bool stationaryAugerSpinActive = false;
   bool landedFinalized = false;
   
 //limit switch logic booleans
@@ -143,7 +143,7 @@ void enterLandedState() {
   landingDetectCount  = 0;
   hasValidInflightAltitude  = false;
   leadScrewFullyExtended  = false;
-  augerSpinActive  = false;
+  stationaryAugerSpinActive  = false;
   landedFinalized  = false;
 
 }
@@ -448,45 +448,41 @@ void loop(){
 
 
   case (LANDED): {
+    //if the 15 minutes have passed, just return to the program continues forever
     if (landedFinalized ) {
       return;
     }
 
+    //delay 2 seconds
     delay(2000);
 
     startSoilLoggingIfNeeded();
     checkOrientationStep();
 
     //switch logic
-    upperSwitchPressed = (digitalReadFast(kUpperLimitSwitchPin) == HIGH);
-    lowerSwitchPressed = (digitalReadFast(kLowerLimitSwitchPin) == HIGH);
+    upperSwitchPressed = (digitalReadFast(kUpperLimitSwitchPin) == HIGH); //true if the upper limit switch is currently pressed
+    lowerSwitchPressed = (digitalReadFast(kLowerLimitSwitchPin) == HIGH); //true if the lower limit switch is currently pressed
 
     upperStateChange = (upperSwitchPressed && !lastUpperSwitchPressed); //when the switch is pressed but wasnt before
     lowerStateChange = (lowerSwitchPressed && !lastLowerSwitchPressed);
 
-    lastUpperSwitchPressed = upperSwitchPressed; //resetting for next time
+    lastUpperSwitchPressed = upperSwitchPressed; //making last the current for next loop
     lastLowerSwitchPressed = lowerSwitchPressed;
 
-    static elapsedMillis landedLogTimer;
-
-    
+    //if the upper limit switch is pressed and was not before, and the number of top hits is zero, stopping the lead screw motors and increasing number of top hits
     if (upperStateChange && topHits  == 0) { 
       Serial.println("upper switch pressed");
       leadScrewMotor.stopMotorWithCoast();
       topHits ++; 
     }
 
+    //if the number of top hits is zero, moving the lead screw forward (up) in order to reach the upper limit switch
     if (topHits  == 0) {
       Serial.println("Retracting lead screw to find top switch");
       leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
     }
 
-    if(millis() - landedStartTime  >= kWaterTimeoutMs){
-      waterMotor.stopMosfet();
-      waterDispensed = true;
-
-    }
-
+    //if the bottom hits is zero and the top hits is one, means the lead screw is at the top, so starting the auger turning, moving the leadscrew downwards, and setting isMovingUp to false
     if (bottomHits  == 0 && topHits  == 1) {
       Serial.println("top reached once, drilling down and spinning auger");
       augerMotor.moveMosfet();
@@ -494,30 +490,35 @@ void loop(){
       isMovingUp = false;
     }
 
+    //if the lead screw is moving downwards, bottom hits is currently zero, and the lower limit switch was hit, increasing the number of bottom hits
     if (isMovingUp==false && bottomHits  == 0 && lowerStateChange) {
       Serial.println("Lower switch pressed");
       bottomHits ++; //hit the bottom, wasnt there before, increase bottom hits
     }
 
+    //if the top hits is one and bottom hits is one, and the auger is not stationarily moving, stopping the lead screw, setting leadScrewFullyExtended to true, and setting stationaryAugerSpinActive, then starting the auger spin timer
     if (bottomHits  == 1 && topHits  == 1) {
-      if (!augerSpinActive ) {
+      if (!stationaryAugerSpinActive ) {
         Serial.println("bottom reached, stop lead screw, hold auger spin for 10s");
         leadScrewMotor.stopMotorWithCoast();
         leadScrewFullyExtended  = true;
-        augerSpinActive  = true; //stop extending, keep spinning
+        stationaryAugerSpinActive  = true; //stop extending, keep spinning
         augerSpinTimer  = 0;
       }
     }
 
-    if (leadScrewFullyExtended  && bottomHits  == 1 && topHits  == 1 &&
-        augerSpinActive  && augerSpinTimer  >= kAugerSpinDurationMs) {
+    //if the lead screw is fully exteneded, bottom and top hits are one, the auger is spinning stationary, and the alloted 10s as passed, setting augerSpinStationary to false, leadScrewFullyExtended to false,
+    // and moving the lead screw up, then setting isMovingUp to ture
+    if (leadScrewFullyExtended  && bottomHits  == 1 && topHits  == 1 && stationaryAugerSpinActive  && augerSpinTimer  >= kAugerSpinDurationMs) {
       Serial.println("Auger spin window complete, retracting lead screw");
-      augerSpinActive  = false;
+      stationaryAugerSpinActive  = false;
       leadScrewFullyExtended  = false;
       leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
       isMovingUp = true;
     }
 
+    //if the lead screw is moving up, the upper limit switch is hit, and the bottom and top hits are one, 
+    //increasing top hits to 2 and stopping the lead screw, then setting isMovingUp to false
     if (isMovingUp && upperStateChange && bottomHits  == 1 && topHits  == 1) {
       Serial.print("Upp Switch pressed while retracting");
       leadScrewMotor.stopMotorWithCoast();
@@ -525,6 +526,7 @@ void loop(){
       topHits ++;
     }
 
+    //is not moving up, the bottom hits is 1, top is 2, water is not dispensed and the water is not gone, then setting water start time to current millis(), then starting the warter motor
     if (isMovingUp == false && bottomHits  == 1 && topHits  == 2 && !waterDispensed && !waterGone) {
       Serial.println("drilling sequence complete, starting water motor");
       waterMotorStartTime = millis();
@@ -532,10 +534,12 @@ void loop(){
 
     }
 
-    static elapsedMillis soilTimer; //starts the timer
+    //starting the 
+    static elapsedMillis soilTimer; //starts the timer for soilTimer
     if (soilTimer > 2000) { // Read every 2 seconds
       float32_t raw;
 
+      //getting pH, eletrical conductivity, and nitrogen content
       if (readRegister(0x0006, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
         pH  = raw/100.0f;
       }
@@ -547,17 +551,23 @@ void loop(){
         nitrogenMgKg  = raw;
       }
 
-      soilData .addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
+      //adding data to the soil data file
+      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
+
+      //resetting the soilTimer
       soilTimer = 0;
     }
     
-    if(millis() - waterMotorStartTime >= kWaterTimeoutMs){
+    //if the water motor has started moving (triggers the water start time to be  saved number) and has been moving for more tahn 60 seconds, stopping the water motor and setting the water dispensed as true
+    if(waterMotorStartTime!=0 && millis() - waterMotorStartTime  >= kWaterTimeoutMs){
       waterDispensed = true;
       waterGone = true;
       waterMotor.stopMosfet();
 
     }
 
+
+    //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
     if (millis() - landedStartTime  >= kLandedTimeoutMs) {
       Serial.println("landed timeout reached, stopping all motors");
       augerMotor.stopMosfet();
@@ -570,20 +580,17 @@ void loop(){
       return;
     }
 
-    if (topHits  == 2 && bottomHits  == 1 && waterDispensed) {
+    //else, if the tophits is 2, bottom is one, and the water is dispensedand gone, resetting the landed state to start the process again (this time w no water being dispensed for future iterations)
+    if (topHits  == 2 && bottomHits  == 1 && waterDispensed && waterGone) {
       Serial.println("cycle complete, resetting counters to start the process again (no water pump this time)");
       enterLandedState();
     }
 
+    //just making sure the state staying in landed
     state = LANDED;
-    delay(2000);
-  
+
   break;
   }
-
-
-
-
 
   default:
   return;
