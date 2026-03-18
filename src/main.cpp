@@ -39,8 +39,6 @@ HardwareSerial &modbus = Serial2;
   File dataFile;
 
   FlightState state = PREFLIGHT; //initializng state
-  FlightState lastLoggedstate = PREFLIGHT;
-  bool hasLoggedInitialstate = false;
 
 //initalizing time markers
   float inflightStartTime  = 0;
@@ -59,6 +57,7 @@ HardwareSerial &modbus = Serial2;
   uint16_t launchDetectCount = 0; // amount of times the liftoff threshold has been met, must has valid and high enoough accel from both sensors to count. Must have 5 consecutive samples
   uint16_t landingDetectCount = 0; // amount of times the landing threshold has been met, must have low accel and low change in altitude to count. Must have 5 consecutive samples
 
+  //initalizng the current and previous altitude, as well as valid bool
   float32_t currentAltitude = 0.0f;
   float32_t previousAltitude = 0.0f;
   bool hasValidInflightAltitude = false;
@@ -90,7 +89,10 @@ HardwareSerial &modbus = Serial2;
   elapsedMillis augerSpinTimer;
   elapsedMillis soilTimer;
 
-/*-------------------------FUNCTIONS-------------------------------------*/
+/*---------------------------------------------------------------------------FUNCTIONS-------------------------------------------------------------------------*/
+
+
+//------------------------------------------------------ SANITY CHECKS AND MATHMATICAL SENSOR DATA FUNCTIONS ------------------------------------------------------
 
 /*This function will return the absolute value of val*/
 float32_t absScalarF32(float32_t val) {
@@ -125,6 +127,8 @@ float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
   return magnitudeSquared;
 }
 
+//------------------------------------------------------ LANDED STATE CHANGE/INITIALIZATION FUNCTION ------------------------------------------------------
+
 /*This function will reset all vairables needed when entering the landed state, as well as log the landed state start time*/
 void enterLandedState() {
   state = LANDED;
@@ -148,6 +152,8 @@ void enterLandedState() {
 
 }
 
+//------------------------------------------------------ ORIENTATION FUNCTION ------------------------------------------------------
+
 /*This function will check the orientation of the nosecone and turn the nosecone accordingly if not aligned. */
 void checkOrientationStep() {
   //getting the gravity vector from bno
@@ -170,12 +176,22 @@ void checkOrientationStep() {
   }
 
   //if the y axis is within the needed range, stopping the motor and setting the orientMotor to true as it was aligned properly and returning to main program
-  if (gravityY <= kOrientationAlignedYMax && gravityY >= kOrientationAlignedYMin) {
+  if(gravityY>kOrientationAlignedYMax){
+    orientMotor.moveMotorForward(1);
+  }
+  else if (gravityY<kOrientationAlignedYMin){
+    orientMotor.moveMotorBackward(1);
+  }
+  else
     orientMotor.stopMotorWithCoast();
     Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
   }
-}
+
+
+
+
+//------------------------------------------------------ DATA FILE FUNCTIONS ------------------------------------------------------
 
 /*This function will start or restart the flight logging if the current index of the buffer is zero. It will set the datafile in SD card to the current file
 name of the flight log file.*/
@@ -209,6 +225,10 @@ void finishSoilLogging() {
   soilData.increaseCurrentIndexBy(-1);
   soilData.printSoilDataToFile(dataFile );
 }
+
+
+
+//------------------------------------------------------ SENSOR FUNCTION ------------------------------------------------------
 
 /*This function checks if all the sensors are properly communicating iwht the teensy, does not return anything, just performs connection checks*/
 void checkSensorConnections() {
@@ -285,10 +305,6 @@ void setup(){
 void loop(){
   //checking sensor connections
   checkSensorConnections();
-
-
-
-
 
 
   switch (state){

@@ -5,7 +5,6 @@ namespace{
 int upperPin = 2;
 int lowerPin = 3;
 int led = 13;
-
 }
 
 void setup() {
