@@ -2,8 +2,6 @@
 #include <Arduino.h>
 #include "Constants.hpp"
 namespace{
-int upperPin = 2;
-int lowerPin = 3;
 int led = 13;
 }
 
@@ -11,8 +9,8 @@ void setup() {
   Serial.begin(9600);
   // put your setup code here, to run once:
   pinMode(led, OUTPUT);
-  pinMode(upperPin, INPUT_PULLUP);
-  pinMode(lowerPin, INPUT_PULLUP);
+  pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
+  pinMode(kLowerLimitSwitchPin, INPUT_PULLUP);
 
 }
 
@@ -21,7 +19,7 @@ void loop() {
  // Serial.print(digitalRead(upperPin));
   Serial.println("loop");
   
-  if (digitalRead(upperPin) == HIGH){
+  if (digitalRead(kUpperLimitSwitchPin) == HIGH){
     Serial.println("Upper Hit");
     digitalWrite(led, HIGH);
     delay(20);
@@ -32,7 +30,7 @@ void loop() {
     digitalWrite(led, LOW);
   }
 
-  if (digitalRead(lowerPin) == HIGH){
+  if (digitalRead(kLowerLimitSwitchPin) == HIGH){
     Serial.println("Lower Hit");
     digitalWrite(led, HIGH);
     delay(50);

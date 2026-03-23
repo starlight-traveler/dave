@@ -15,26 +15,57 @@
 
 namespace{
 
-// int motorPin = 10;
-int in1 = 24;
-int in2 = 25;
-// int sleep = 38;
 int ledOuputPin = 13;
-int upperPin = 2;
-int lowerPin = 3;
 
 }
+
+void movingUp(){
+    digitalWrite(kLeadScrewMotorIn1, HIGH);
+    digitalWrite(kLeadScrewMotorIn2, LOW);
+
+  if(digitalRead(kUpperLimitSwitchPin) == HIGH){
+    Serial.println("hit");
+    digitalWrite(kLeadScrewMotorIn2, LOW);
+    digitalWrite(kLeadScrewMotorIn1, LOW);
+
+    delay(5000);
+
+    movingDown();
+
+    //while(1){}
+  }
+
+}
+
+void movingDown(){
+    digitalWrite(kLeadScrewMotorIn1, LOW);
+    digitalWrite(kLeadScrewMotorIn2, HIGH);
+
+  if(digitalRead(kLowerLimitSwitchPin) == HIGH){
+    Serial.println("hit");
+    digitalWrite(kLeadScrewMotorIn2, LOW);
+    digitalWrite(kLeadScrewMotorIn1, LOW);
+
+    delay(5000);
+
+    movingUp();
+
+   // while(1){}
+  }
+
+}
+
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  pinMode(in1, OUTPUT);
-  pinMode(in2, OUTPUT);
+  pinMode(kLeadScrewMotorIn1, OUTPUT);
+  pinMode(kLeadScrewMotorIn2, OUTPUT);
  // pinMode(sleep, OUTPUT);
   //pinMode(motorPin, OUTPUT);
   pinMode(ledOuputPin, OUTPUT);
-  pinMode(upperPin, INPUT_PULLUP);
-  pinMode(lowerPin, INPUT_PULLUP);
+  pinMode(kUpperLimitSwitchPin, INPUT_PULLUP);
+  pinMode(kLowerLimitSwitchPin, INPUT_PULLUP);
 
 
   // digitalWrite(sleep, HIGH);
@@ -49,17 +80,7 @@ void setup() {
 
 void loop(){
 
-  
-  digitalWrite(in1, HIGH);
-  digitalWrite(in2, LOW);
-
-if(digitalRead(upperPin) == HIGH){
-  Serial.println("hit");
-  digitalWrite(in2, LOW);
-  digitalWrite(in1, LOW);
-
-  while(1){}
-}
+  movingDown();
 
 delay(2000);
 

@@ -182,11 +182,12 @@ void checkOrientationStep() {
   else if (gravityY<kOrientationAlignedYMin){
     orientMotor.moveMotorBackward(1);
   }
-  else
+  else {
     orientMotor.stopMotorWithCoast();
     Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
   }
+}
 
 
 
