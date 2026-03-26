@@ -13,10 +13,10 @@
 
 namespace{
 
-#define RS485_DIR_PIN 27
+#define RS485_DIR_PIN 21
 #define SLAVE_ID 0x01
 
-HardwareSerial &modbus = Serial2;
+HardwareSerial &modbus = Serial1;
 
   enum FlightState {
     PREFLIGHT,
