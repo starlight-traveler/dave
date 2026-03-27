@@ -26,9 +26,9 @@ HardwareSerial &modbus = Serial1;
 
 //creating motor objects
   motorDriver orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
-  motorDriver augerMotor = motorDriver(gpioAuger);
+  motorDriver augerMotor = motorDriver(kAugerControlPin);
   motorDriver leadScrewMotor  = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
-  motorDriver waterMotor  = motorDriver(gpioWater);
+  motorDriver waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
 //creating sensor objects
   Adafruit_BMP3XX bmp;
@@ -189,9 +189,6 @@ void checkOrientationStep() {
   }
 }
 
-
-
-
 //------------------------------------------------------ DATA FILE FUNCTIONS ------------------------------------------------------
 
 /*This function will start or restart the flight logging if the current index of the buffer is zero. It will set the datafile in SD card to the current file
@@ -261,19 +258,20 @@ void setup(){
 
   Serial.println("Soil sensor Modbus reader started");
 
-  
   //starting ledpin
   pinMode(ledPin, OUTPUT);
 
   //intializing the motors inside the setup
   orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
-  augerMotor  = motorDriver(gpioAuger);
+  augerMotor  = motorDriver(kAugerControlPin);
   leadScrewMotor = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
-  waterMotor  = motorDriver(gpioWater);
+  waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
   //setting pins to low so they dont float
+  orientMotor.stopMotorWithCoast();
+  leadScrewMotor.stopMotorWithCoast();
+  waterMotor.stopMotorWithCoast();
   augerMotor.stopMosfet();
-  waterMotor.stopMosfet();
 
   //setup the sensors
   setupBMP(&bmp);
@@ -300,7 +298,6 @@ void setup(){
   preflightStateTimer  = 0;
 
 }
-
 
 /*------------------------------------------------- LOOP -----------------------------------------------------------*/
 void loop(){
@@ -466,7 +463,7 @@ void loop(){
 
   case (LANDED): {
     //if the 15 minutes have passed, just return to the program continues forever
-    if (landedFinalized ) {
+    if (landedFinalized) {
       return;
     }
 
@@ -547,7 +544,7 @@ void loop(){
     if (isMovingUp == false && bottomHits  == 1 && topHits  == 2 && !waterDispensed && !waterGone) {
       Serial.println("drilling sequence complete, starting water motor");
       waterMotorStartTime = millis();
-      waterMotor.moveMosfet();
+      waterMotor.moveMotorForward(kWaterDutyCycle);
 
     }
 
@@ -579,7 +576,7 @@ void loop(){
     if(waterMotorStartTime!=0 && millis() - waterMotorStartTime  >= kWaterTimeoutMs){
       waterDispensed = true;
       waterGone = true;
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
 
     }
 
@@ -589,7 +586,7 @@ void loop(){
       Serial.println("landed timeout reached, stopping all motors");
       augerMotor.stopMosfet();
       leadScrewMotor.stopMotorWithCoast();
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
       orientMotor.stopMotorWithCoast();
 
       finishSoilLogging();
@@ -613,6 +610,8 @@ void loop(){
   return;
 
   }
+
+  delay(500);
 
 }
 

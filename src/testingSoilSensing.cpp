@@ -25,17 +25,17 @@ driverSD soilData = driverSD(kSoilDataBufferSize);
 
 void startSoilLoggingIfNeeded() {
   if (soilData .getCurrentIndex() == 0) {
-    Serial.print("[FC][LANDED] opening soil log file: ");
+    Serial.print("Opening soil log file: ");
     Serial.print(soilData .getCurrentFileName());
     dataFile  = SD.open(soilData .getCurrentFileName(), FILE_WRITE);
-    Serial.print(dataFile  ? F("[FC][LANDED] file open OK") : F("[FC][LANDED] file open FAILED"));
+    Serial.print(dataFile  ? F("File open OK") : F("File open FAILED"));
   }
 }
 
 void finishSoilLogging() {
-  Serial.print("[FC][LANDED] finalizing soil log");
-  soilData .increaseCurrentIndexBy(-1);
-  soilData .printSoilDataToFile(dataFile );
+  Serial.print("Finalizing soil log");
+  soilData.increaseCurrentIndexBy(-1);
+  soilData.printSoilDataToFile(dataFile );
 }
 
 
@@ -48,6 +48,7 @@ void setup(){
     digitalWrite(RS485_DIR_PIN, LOW);
 
     Serial.println("Soil sensor Modbus reader started");
+    delay(2000);
 
     //starting ledpin
     pinMode(13, OUTPUT);
@@ -55,6 +56,7 @@ void setup(){
 
       if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD mount failed, halting and outputting light");
+    delay(2000);
     while (1) {
         digitalWrite(ledPin, HIGH);
     }
@@ -84,6 +86,17 @@ void loop(){
 
       soilData .addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
       soilTimer = 0;
+
+      Serial.print("PH: ");
+      Serial.println(pH);
+      Serial.print("Eletrical Conductivity: ");
+      Serial.println(electricalConductivity);
+      Serial.print("Nitrogen Content: ");
+      Serial.println(nitrogenMgKg);
+      Serial.println("\n-------------------------------------------\n");
+      delay(2000);
     }
+
+    delay(2000);
     
 }

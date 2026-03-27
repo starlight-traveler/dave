@@ -10,7 +10,7 @@
  const uint32_t kMainHeartbeatMs = 1000;     // Heartbeat print period from main loop (milliseconds).
 
 // -------------------- Soil/RS-485 --------------------
- const uint8_t kRs485DirPin = 27;             // RS-485 DE/RE direction control GPIO.
+ const uint8_t kRs485DirPin = 21;             // RS-485 DE/RE direction control GPIO.
  const uint8_t kSoilSensorSlaveId = 0x01;    // Modbus slave address of the soil sensor.
  const uint32_t kSoilSensorBaud = 9600;      // UART baud rate for the soil sensor bus.
 
@@ -18,16 +18,18 @@
  const int32_t kUpperLimitSwitchPin = 2;     // Upper travel limit switch input pin (active low with pull-up).
  const int32_t kLowerLimitSwitchPin = 3;     // Lower travel limit switch input pin (active low with pull-up).
 
- const  int32_t kOrientMotorIn1 = 36;         // Orientation motor driver IN1/PWM pin.
- const  int32_t kOrientMotorIn2 = 37;         // Orientation motor driver IN2/PWM pin.
+ const int32_t kOrientMotorIn1 = 36;         // Orientation motor driver IN1/PWM pin.
+ const int32_t kOrientMotorIn2 = 37;         // Orientation motor driver IN2/PWM pin.
  const int32_t kOrientMotorSleep = 38;       // Orientation motor driver nSLEEP pin.
 
- const  int32_t gpioAuger = 14;               // Auger motor controller PWM control pin.
+ const  int32_t kAugerControlPin = 34;       // Auger motor controller PWM control pin.
+ 
+const  int32_t kWaterMotorIn1 = 24;          // Water motor driver IN1/PWM pin.
+const  int32_t kWaterMotorIn2 = 25;         // Water motor driver IN2/PWM pin.
+const  int32_t kWaterMotorSleep = -1;       // Water motor driver nSLEEP pin (not used)
 
- const  int32_t gpioWater = 10;               // Water motor controller PWM control pin.
-
- const int32_t kLeadScrewMotorIn1 = 24;      // Lead screw motor driver IN1/PWM pin.
- const int32_t kLeadScrewMotorIn2 = 25;      // Lead screw motor driver IN2/PWM pin.
+ const int32_t kLeadScrewMotorIn1 = 28;      // Lead screw motor driver IN1/PWM pin.
+ const int32_t kLeadScrewMotorIn2 = 29;      // Lead screw motor driver IN2/PWM pin.
  const  int32_t kLeadScrewMotorSleep = -1;    // Lead screw nSLEEP pin; -1 means not connected/unused.
 
  const  int32_t ledPin = 13;
@@ -57,7 +59,7 @@ const float32_t kAltitudeValidMaxM = 100000.0f;           // Maximum valid barom
 
 // -------------------- Motion Tuning --------------------
  const float32_t kLeadScrewDutyCycle = 0.4f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).
- const  float32_t kWaterDutyCycle = 0.75f;                  // Water motor PWM duty cycle (0.0 to 1.0).
+ const  float32_t kWaterDutyCycle = 0.5f;                  // Water motor PWM duty cycle (0.0 to 1.0).
  const  float32_t kOrientationDutyCycle = 1.0f;             // Orientation motor PWM duty cycle (0.0 to 1.0).
  const float32_t kOrientationAlignedYMin = -58.0f;         // Lower gravity-Z bound for "aligned" orientation (m/s^2).
  const  float32_t kOrientationAlignedYMax = -50.0f;          // Upper gravity-Z bound for "aligned" orientation (m/s^2).

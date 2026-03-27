@@ -27,9 +27,9 @@ HardwareSerial &modbus = Serial1;
   const char* landedTestSoilRoot = "LandedTestingSoil";
 
   motorDriver orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
-  motorDriver augerMotor = motorDriver(gpioAuger);
+  motorDriver augerMotor = motorDriver(kAugerControlPin);
   motorDriver leadScrewMotor  = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
-  motorDriver waterMotor  = motorDriver(gpioWater);
+  motorDriver waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
   Adafruit_BMP3XX bmp;
   Adafruit_BNO055  bno =  Adafruit_BNO055(55, 0x28);
@@ -129,7 +129,7 @@ void checkOrientationStep() {
       invalidGravityLogTimer = 0;
       Serial.println("[FC][LANDED][ORIENT] gravity invalid, skipping orientation step");
     }
-    orientMotor .stopMotorWithCoast();
+    orientMotor.stopMotorWithCoast();
     return;
   }
 
@@ -141,21 +141,21 @@ void checkOrientationStep() {
 
   if (gravityY <= kOrientationAlignedYMax &&
      gravityY >= kOrientationAlignedYMin) {
-    orientMotor .stopMotorWithCoast();
+    orientMotor.stopMotorWithCoast();
     orientationAligned  = true;
     Serial.println("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete");
     return;
   }
 
   if (orientationTimer  >= kOrientationTimeoutMs) { // do we think 5 seconds is enough time?
-    orientMotor .stopMotorWithCoast();
+    orientMotor.stopMotorWithCoast();
     orientationAligned  = true;
     Serial.println("[FC][LANDED][ORIENT] orientation timeout -> stopping motor");
   }
 }
 
 void startSoilLoggingIfNeeded() {
-  if (soilData .getCurrentIndex() == 0) {
+  if (soilData.getCurrentIndex() == 0) {
     Serial.print("[FC][LANDED] opening soil log file: ");
     Serial.print(soilData .getCurrentFileName());
     dataFile  = SD.open(soilData .getCurrentFileName(), FILE_WRITE);
@@ -166,8 +166,8 @@ void startSoilLoggingIfNeeded() {
 
 void finishSoilLogging() {
   Serial.print("[FC][LANDED] finalizing soil log");
-  soilData .increaseCurrentIndexBy(-1);
-  soilData .printSoilDataToFile(dataFile );
+  soilData.increaseCurrentIndexBy(-1);
+  soilData.printSoilDataToFile(dataFile );
 }
 
 void checkSensorConnections() {
@@ -199,13 +199,13 @@ void setup(){
   pinMode(ledPin, OUTPUT);
 
   orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
-  augerMotor  = motorDriver(gpioAuger);
+  augerMotor  = motorDriver(kAugerControlPin);
   leadScrewMotor = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
-  waterMotor  = motorDriver(gpioWater);
+  waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
   //setting pins to low so they dont float
   augerMotor.stopMosfet();
-  waterMotor.stopMosfet();
+  Serial.println("Stopped Auger MOSFET");
 
   setupBMP(&bmp );
   setupBNO055(&bno );
@@ -256,7 +256,7 @@ void loop(){
     if (upperStateChange && topHits  == 0) { 
       Serial.println("upper switch pressed");
       leadScrewMotor.stopMotorWithCoast();
-      topHits ++; 
+      topHits++; 
     }
 
     if (topHits  == 0) {
@@ -265,7 +265,7 @@ void loop(){
     }
 
     if(millis() - landedStartTime  >= kWaterTimeoutMs){
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
       waterDispensed = true;
 
     }
@@ -311,7 +311,7 @@ void loop(){
     if (isMovingUp == false && bottomHits  == 1 && topHits  == 2 && !waterDispensed && !waterGone) {
       Serial.println("drilling sequence complete, starting water motor");
       waterMotorStartTime = millis();
-      waterMotor.moveMosfet();
+      waterMotor.moveMotorForward(kWaterDutyCycle);
 
     }
 
@@ -330,14 +330,14 @@ void loop(){
         nitrogenMgKg  = raw;
       }
 
-      soilData .addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
+      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
       soilTimer = 0;
     }
     
     if(millis() - waterMotorStartTime >= kWaterTimeoutMs){
       waterDispensed = true;
       waterGone = true;
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
 
     }
 
@@ -345,7 +345,7 @@ void loop(){
       Serial.println("landed timeout reached, stopping all motors");
       augerMotor.stopMosfet();
       leadScrewMotor.stopMotorWithCoast();
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
       orientMotor.stopMotorWithCoast();
 
       finishSoilLogging();

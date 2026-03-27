@@ -14,7 +14,7 @@
 #define SLAVE_ID 0x01
 
 HardwareSerial &modbus = Serial2;
-motorDriver waterMotor  = motorDriver(gpioWater);
+motorDriver waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 File dataFile;
 
   float landedStartTime  = 0;
@@ -70,10 +70,10 @@ void setup(){
   pinMode(ledPin, OUTPUT);
 
   //intializing the motors inside the setup
-  waterMotor  = motorDriver(gpioWater);
+  waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
   //setting pins to low so they dont float
-  waterMotor.stopMosfet();
+  waterMotor.stopMotorWithCoast();
   
 
   //begin the sd card, shining led light if cannot find or connect to
@@ -87,7 +87,7 @@ void setup(){
   //setting up the file names for the flight data and soil data so can be logged properly
   soilData.begin(kSoilDataRoot);
 
-  waterMotor.moveMosfet(); //starting water motor
+  waterMotor.moveMotorForward(0.5); //starting water motor
   landedStartTime = millis();
 
 }
@@ -122,7 +122,7 @@ void loop(){
     if(waterMotorStartTime!=0 && millis() - waterMotorStartTime  >= kWaterTimeoutMs){
       waterDispensed = true;
       waterGone = true;
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
 
     }
 
@@ -130,7 +130,7 @@ void loop(){
     //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
     if (millis() - landedStartTime  >= kLandedTimeoutMs) {
       Serial.println("landed timeout reached, stopping all motors");
-      waterMotor.stopMosfet();
+      waterMotor.stopMotorWithCoast();
 
       finishSoilLogging();
       while(1){
