@@ -55,14 +55,14 @@ const float32_t kAltitudeValidMaxM = 100000.0f;           // Maximum valid barom
  const  uint32_t kOrientationTimeoutMs = 5000;              // Max orientation motor run time before forcing complete (milliseconds).
  const  uint32_t kSwitchPollPeriodMs = 5;                   // Limit switch polling interval (milliseconds).
  const  uint32_t kSensorHealthPollMs = 2000;                // Sensor connectivity/health check interval (milliseconds).
- const  uint32_t kWaterTimeoutMs = 60000;                   // the time water will run before stopping
+ const  uint32_t kWaterTimeoutMs = 90000;                   // the time water will run before stopping
 
 // -------------------- Motion Tuning --------------------
  const float32_t kLeadScrewDutyCycle = 0.4f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).
  const  float32_t kWaterDutyCycle = 0.5f;                  // Water motor PWM duty cycle (0.0 to 1.0).
  const  float32_t kOrientationDutyCycle = 1.0f;             // Orientation motor PWM duty cycle (0.0 to 1.0).
- const float32_t kOrientationAlignedYMin = -58.0f;         // Lower gravity-Z bound for "aligned" orientation (m/s^2).
- const  float32_t kOrientationAlignedYMax = -50.0f;          // Upper gravity-Z bound for "aligned" orientation (m/s^2).
+ const float32_t kOrientationAlignedYMin = 37.0f;         // Lower gravity-Z bound for "aligned" orientation (m/s^2).
+ const  float32_t kOrientationAlignedYMax = 48.0;          // Upper gravity-Z bound for "aligned" orientation (m/s^2).
 
 // -------------------- Logging/Buffering --------------------
  const  uint32_t kPreflightLogPeriodMs = 500;               // Serial log period during preflight (milliseconds).

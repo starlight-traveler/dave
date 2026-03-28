@@ -2,21 +2,9 @@
 #include <Arduino.h>
 #include "Constants.hpp"
 
-// int in1 = 28;
-// int in2 = 29;
-//28, 29
-// int sleep = 38;
-
-
-//10, 
-//14
-//24 and 25
-//38, 37, 36
-
 namespace{
 
 int ledOuputPin = 13;
-
 }
 
 void movingUp(){
@@ -30,9 +18,6 @@ void movingUp(){
 
     delay(5000);
 
-    movingDown();
-
-    //while(1){}
   }
 
 }
@@ -50,7 +35,6 @@ void movingDown(){
 
     movingUp();
 
-   // while(1){}
   }
 
 }
@@ -80,7 +64,8 @@ void setup() {
 
 void loop(){
 
-  movingDown();
+    digitalWrite(kLeadScrewMotorIn1, LOW);
+    digitalWrite(kLeadScrewMotorIn2, HIGH);
 
 delay(2000);
 

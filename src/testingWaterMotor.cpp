@@ -31,20 +31,24 @@ void setup(){
   Serial.println("Configured Water Motor");
   delay(2000);
 
-  waterMotor.moveMotorForward(0.5); //starting water motor
+  waterMotor.moveMotorBackward(1); //starting water motor
   landedStartTime = millis();
+  waterMotorStartTime = millis();
 
 }
 
 void loop(){
-      //resetting the soilTimer
 
-    //if the water motor has started moving (triggers the water start time to be  saved number) and has been moving for more tahn 60 seconds, stopping the water motor and setting the water dispensed as true
-    if(waterMotorStartTime!=0 && millis() - waterMotorStartTime  >= 30000){
+    //if the water motor has started moving (triggers the water start time to be  saved number) and has been moving for more tahn 90 seconds, stopping the water motor and setting the water dispensed as true
+    if(waterMotorStartTime!=0 && millis() - waterMotorStartTime  >= 90000){
       waterDispensed = true;
       waterGone = true;
       waterMotor.stopMotorWithCoast();
-
+      Serial.println("Water motor stopped");
+    }
+    else{
+    Serial.println("Moving Water pump...");
+    Serial.println(millis() - waterMotorStartTime);
     }
 
     delay(200);
@@ -59,6 +63,7 @@ void loop(){
         delay(20000);
       }
     }
+
 
     
 }

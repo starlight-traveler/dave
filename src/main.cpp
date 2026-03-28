@@ -154,40 +154,29 @@ void enterLandedState() {
 
 //------------------------------------------------------ ORIENTATION FUNCTION ------------------------------------------------------
 
-/*This function will check the orientation of the nosecone and turn the nosecone accordingly if not aligned. */
+
+  /*This function will check the orientation of the nosecone and turn the nosecone accordingly if not aligned. */
 void checkOrientationStep() {
   //getting the gravity vector from bno
     const imu::Vector<3> gravity =  bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
-    const float32_t gravityX = gravity.x();
-    const float32_t gravityY = gravity.y();
     const float32_t gravityZ = gravity.z();
 
- //if the gravity vector inputted is not same, then start a timer to log how long the program has gone wihtout valid gravity data.
-  if (!accelVectorIsSane(gravityX, gravityY, gravityZ)) {
-    static elapsedMillis invalidGravityLogTimer;
-    //only prints out message every 500 ms so not bombarded with error messages
-    if (invalidGravityLogTimer >= kOrientationLogPeriodMs) {
-      invalidGravityLogTimer = 0;
-      Serial.println("[LANDED][ORIENT] gravity invalid, skipping orientation step");
-    }
-    //if not valid, stopping motor and returning to main program
-    orientMotor.stopMotorWithCoast();
-    return;
-  }
-
+    sensors_event_t event = getBNO055Event(&bno);
+    float orientY = event.orientation.y;
+    
   //if the y axis is within the needed range, stopping the motor and setting the orientMotor to true as it was aligned properly and returning to main program
-  if(gravityY>kOrientationAlignedYMax){
-    orientMotor.moveMotorForward(1);
+  if(orientY>kOrientationAlignedYMax || gravityZ>0){
+    orientMotor.moveMotorForward(kOrientationDutyCycle);
   }
-  else if (gravityY<kOrientationAlignedYMin){
-    orientMotor.moveMotorBackward(1);
+  else if (orientY<kOrientationAlignedYMin || gravityZ>0){
+    orientMotor.moveMotorBackward(kOrientationDutyCycle);
   }
   else {
     orientMotor.stopMotorWithCoast();
     Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
   }
-}
+  }
 
 //------------------------------------------------------ DATA FILE FUNCTIONS ------------------------------------------------------
 
