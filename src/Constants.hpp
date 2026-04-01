@@ -48,18 +48,18 @@ const float32_t kAltitudeValidMaxM = 100000.0f;           // Maximum valid barom
  const uint32_t kPreflightUpdatePeriodMs = 50;             // Preflight state update period (milliseconds).
  const  uint32_t kInflightUpdatePeriodMs = 30;              // Inflight state update period (milliseconds).
  const uint32_t kPreflightTimeoutMs = 21600000;            // Max time to stay in preflight before failover to landed (ms, 6 hours).
- const  uint32_t kInflightTimeoutMs = 180000;               // Hard inflight timeout to force landed transition (ms, 3 minutes).
+ const  uint32_t kInflightTimeoutMs = 150000;               // Hard inflight timeout to force landed transition (ms, 3 minutes).
  const uint32_t kMinInflightBeforeLandingEvalMs = 5000;    // Lockout time before landing checks are allowed (ms, 5 seconds).
  const  uint32_t kLandedTimeoutMs = 900000;                 // Max landed operation duration before stopping motors (ms, 15 minutes).
  const  uint32_t kAugerSpinDurationMs = 10000;              // Extra auger spin hold time after full extension (milliseconds).
  const  uint32_t kOrientationTimeoutMs = 5000;              // Max orientation motor run time before forcing complete (milliseconds).
  const  uint32_t kSwitchPollPeriodMs = 5;                   // Limit switch polling interval (milliseconds).
  const  uint32_t kSensorHealthPollMs = 2000;                // Sensor connectivity/health check interval (milliseconds).
- const  uint32_t kWaterTimeoutMs = 90000;                   // the time water will run before stopping
+ const  uint32_t kWaterTimeoutMs = 60000;                   // the time water will run before stopping
 
 // -------------------- Motion Tuning --------------------
- const float32_t kLeadScrewDutyCycle = 0.4f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).
- const  float32_t kWaterDutyCycle = 0.5f;                  // Water motor PWM duty cycle (0.0 to 1.0).
+ const float32_t kLeadScrewDutyCycle = 1.0f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).
+ const  float32_t kWaterDutyCycle = 1.0f;                  // Water motor PWM duty cycle (0.0 to 1.0).
  const  float32_t kOrientationDutyCycle = 1.0f;             // Orientation motor PWM duty cycle (0.0 to 1.0).
  const float32_t kOrientationAlignedYMin = 37.0f;         // Lower gravity-Z bound for "aligned" orientation (m/s^2).
  const  float32_t kOrientationAlignedYMax = 48.0;          // Upper gravity-Z bound for "aligned" orientation (m/s^2).

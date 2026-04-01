@@ -21,14 +21,15 @@ float32_t nitrogenMgKg = 0.0f;
 float32_t pH = 0.0f;
 float32_t electricalConductivity = 0.0f;
 
+float startTime = 0;
+
 driverSD soilData = driverSD(kSoilDataBufferSize);
 
 void startSoilLoggingIfNeeded() {
   if (soilData .getCurrentIndex() == 0) {
-    Serial.print("Opening soil log file: ");
-    Serial.print(soilData .getCurrentFileName());
+    //Serial.print("Opening soil log file: ");
     dataFile  = SD.open(soilData .getCurrentFileName(), FILE_WRITE);
-    Serial.print(dataFile  ? F("File open OK") : F("File open FAILED"));
+    //Serial.print(dataFile  ? F("File open OK") : F("File open FAILED"));
   }
 }
 
@@ -37,7 +38,6 @@ void finishSoilLogging() {
   soilData.increaseCurrentIndexBy(-1);
   soilData.printSoilDataToFile(dataFile );
 }
-
 
 }
 
@@ -54,7 +54,7 @@ void setup(){
     pinMode(13, OUTPUT);
 
 
-      if (!SD.begin(BUILTIN_SDCARD)) {
+    if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("SD mount failed, halting and outputting light");
     delay(2000);
     while (1) {
@@ -63,14 +63,15 @@ void setup(){
     }
 
     soilData.begin(testSoilRoot);
+    Serial.print("Beginning running...");
+
+    startTime = millis();
 }
 
 
 void loop(){
     startSoilLoggingIfNeeded();
 
-    static elapsedMillis soilTimer; //starts the timer
-    if (soilTimer > 2000) { // Read every 2 seconds
       float32_t raw;
 
       if (readRegister(0x0006, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
@@ -84,19 +85,14 @@ void loop(){
         nitrogenMgKg  = raw;
       }
 
-      soilData .addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
-      soilTimer = 0;
+      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
+      
+      delay(200);
 
-      Serial.print("PH: ");
-      Serial.println(pH);
-      Serial.print("Eletrical Conductivity: ");
-      Serial.println(electricalConductivity);
-      Serial.print("Nitrogen Content: ");
-      Serial.println(nitrogenMgKg);
-      Serial.println("\n-------------------------------------------\n");
-      delay(2000);
+      if(millis() - startTime>60000){
+        finishSoilLogging();
+        Serial.print("Done");
+        while(1){}
+      }
+
     }
-
-    delay(2000);
-    
-}

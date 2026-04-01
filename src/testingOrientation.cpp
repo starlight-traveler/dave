@@ -15,6 +15,8 @@ motorDriver orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrient
 Adafruit_BNO055 bno =  Adafruit_BNO055(55, 0x28);
 Adafruit_ICM20649 icm;
 
+bool isOriented = false;
+
 /*This function will return the absolute value of val*/
 float32_t absScalarF32(float32_t val) {
   float32_t src[1] = {val};
@@ -34,52 +36,31 @@ bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
   return isFiniteAndReasonable(x) && isFiniteAndReasonable(y) && isFiniteAndReasonable(z);
 }
 
-  /*This function will check the orientation of the nosecone and turn the nosecone accordingly if not aligned. */
-void checkOrientationStep() {
-  //getting the gravity vector from bno
-    const imu::Vector<3> gravity =  bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+  void checkOrientationStep() {
+    //getting the gravity vector from bno
+    const imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
     const float32_t gravityZ = gravity.z();
 
-
     sensors_event_t event = getBNO055Event(&bno);
-
     float orientY = event.orientation.y;
 
-    //Serial.print("X:");
-    //Serial.println(orientX);
-    Serial.print("Y: ");
-    Serial.println(orientY);
-    Serial.print("Z Gravity: ");
-    Serial.println(gravityZ);
-    
-    
-
- //if the gravity vector inputted is not same, then start a timer to log how long the program has gone wihtout valid gravity data.
-  //if (!accelVectorIsSane(gravityX, gravityY, gravityZ)) {
-    // static elapsedMillis invalidGravityLogTimer;
-    // //only prints out message every 500 ms so not bombarded with error messages
-    // if (invalidGravityLogTimer >= kOrientationLogPeriodMs) {
-    //   invalidGravityLogTimer = 0;
-    //   //Serial.println("[LANDED][ORIENT] gravity invalid, skipping orientation step");
-    // }
-    //if not valid, stopping motor and returning to main program
-    //orientMotor.stopMotorWithCoast();
-    //return;
-  //}
-
-  //if the y axis is within the needed range, stopping the motor and setting the orientMotor to true as it was aligned properly and returning to main program
-  if(orientY>kOrientationAlignedYMax || gravityZ>0){
+    //if the y axis is within the needed range, stopping the motor and setting the orientMotor to true as it was aligned properly and returning to main program
+    if(orientY<kOrientationAlignedYMin){
     orientMotor.moveMotorForward(kOrientationDutyCycle);
-  }
-  else if (orientY<kOrientationAlignedYMin || gravityZ>0){
+    isOriented = false;
+    } // || gravityZ<-3.0
+    else if (orientY>kOrientationAlignedYMin){
     orientMotor.moveMotorBackward(kOrientationDutyCycle);
-  }
-  else {
+    isOriented = false;
+    }
+    if(orientY>kOrientationAlignedYMin && orientY<kOrientationAlignedYMax && gravityZ > 0.0){
     orientMotor.stopMotorWithCoast();
+    isOriented = true;
     Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
-  }
-  }
+    }
+
+    }
 
 
 void setup(){

@@ -17,18 +17,17 @@
 
 HardwareSerial &modbus = Serial1;
 
-//defining states for flight
+//defining states
   enum FlightState {
     PREFLIGHT,
     INFLIGHT,
     LANDED,
   };
 
-//defining states for landed state
-  enum LandedState { 
-    PLUNGE,
+  enum landedState { 
     IDLE, 
-    RETRACT
+    RETRACT,
+    PLUNGE
   };
 
 //creating motor objects
@@ -46,18 +45,20 @@ HardwareSerial &modbus = Serial1;
   File dataFile;
 
   FlightState state = PREFLIGHT; //initializng state
-  LandedState whereInLanded = PLUNGE;
+  landedState stateOnGround = PLUNGE;
 
 //initalizing time markers
-  float inFlightStartTime  = 0;
+  float inflightStartTime  = 0;
   float landedStartTime  = 0;
   float waterMotorStartTime = 0;
+  float upwardTravelStartTime = 0;
   float idleStartTime = 0;
 
 //varaibles to hold fetched soil sensor data
   float32_t nitrogenMgKg = 0.0f;
   float32_t pH = 0.0f;
   float32_t electricalConductivity = 0.0f;
+
 
   int32_t topHits = 0; //amount of times the top limit switch is hit
   int32_t bottomHits = 0; // amount of times the bottom limit switch is hit
@@ -72,6 +73,12 @@ HardwareSerial &modbus = Serial1;
 
   driverSD flightData = driverSD(kFlightDataBufferSize); //creating flight data object with correct buffer size (8), to store needed data
   driverSD soilData = driverSD(kSoilDataBufferSize); //creating soil data object w correct buffer size. 
+
+//motor driver logic booleans
+  bool leadScrewFullyExtended = false;
+  bool stationaryAugerSpinActive = false;
+  bool landedFinalized = false;
+  bool isOriented = false;
   
 //limit switch logic booleans
   bool upperSwitchPressed = false;
@@ -80,11 +87,12 @@ HardwareSerial &modbus = Serial1;
   bool lastLowerSwitchPressed = false;
   bool upperStateChange = false;
   bool lowerStateChange = false;
-
-  bool waterGone = false; 
+  bool isMovingUp = false;
+  bool waterDispensed = false; //will be true once water dipenses once
+  bool waterGone = false; // will be true after
+  bool stationarySpinComplete = false;
+  bool movedUpFiveSeconds = false;
   bool secondPlunge = false;
-  bool isOriented = false;
-  bool landedFinalized = false;
 
 
 //timers for state change tracking
@@ -136,27 +144,24 @@ float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
 
 /*This function will reset all vairables needed when entering the landed state, as well as log the landed state start time*/
 void enterLandedState() {
-  state = LANDED;
   landedStartTime  = millis();
 
-  //making sure the motors are stopped
-  orientMotor.stopMotorWithCoast();
-  leadScrewMotor.stopMotorWithCoast();
-  waterMotor.stopMotorWithCoast();
-  augerMotor.stopMosfet();
-
-  launchDetectCount  = 0;
-  landingDetectCount  = 0;
-  hasValidInflightAltitude  = false;
-
-  landedFinalized  = false;
   upperSwitchPressed = false;
   lowerSwitchPressed = false;
   lastUpperSwitchPressed = false;
   lastLowerSwitchPressed = false;
   upperStateChange = false;
   lowerStateChange = false;
-  secondPlunge = false;
+
+  bottomHits  = 0;
+  launchDetectCount  = 0;
+  landingDetectCount  = 0;
+  hasValidInflightAltitude  = false;
+  leadScrewFullyExtended  = false;
+  stationaryAugerSpinActive  = false;
+  landedFinalized  = false;
+  stationarySpinComplete = false;
+  movedUpFiveSeconds = false;
 
 }
 
@@ -188,36 +193,6 @@ void checkOrientationStep() {
     }
 
     }
-
-
-
-//------------------------------------------------------ SOIL DATA FUNCTION ------------------------------------------------------
-
-
-void getAndLogSoilData(){
-    static elapsedMillis soilTimer; //starts the timer for soilTimer
-    if (soilTimer > 2000) { // Read every 2 seconds
-      float32_t raw;
-
-      //getting pH, eletrical conductivity, and nitrogen content
-      if (readRegister(0x0006, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
-        pH  = raw/100.0f;
-      }
-      if (readRegister(0x0015, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
-        electricalConductivity  = raw;
-
-      }
-      if (readRegister(0x001E, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
-        nitrogenMgKg  = raw;
-      }
-
-      //adding data to the soil data file
-      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
-
-      //resetting the soilTimer
-      soilTimer = 0;
-    }
-  }
 
 //------------------------------------------------------ DATA FILE FUNCTIONS ------------------------------------------------------
 
@@ -329,10 +304,16 @@ void setup(){
 
 }
 
+float inflightStart = 0;
 /*------------------------------------------------- LOOP -----------------------------------------------------------*/
 void loop(){
+
+  if (landedFinalized) {
+      return;
+    }
   //checking sensor connections
   checkSensorConnections();
+
 
 
   switch (state){
@@ -342,6 +323,7 @@ void loop(){
       return;
     }
 
+    Serial.println("PREFLIGHT");
     //getting ICM acceleration and checking if it sane, if so, getting it squared for comparison to threshold
     sensors_event_t accelICM = getICM20649Accel(&icm);
     const bool icmAccelSane = accelVectorIsSane(accelICM.acceleration.x, accelICM.acceleration.y, accelICM.acceleration.z);
@@ -359,7 +341,7 @@ void loop(){
     //launch sample will return true if all values gotten are same and within thresholds to count towards launch, and false if not
     //both accels must be above 4gs
     const bool launchSample = icmAccelSane && bnoAccelSane && accelICMSquared > kAccelThresholdSquared && accelBNOSquared > kAccelThresholdSquared;
-
+    Serial.println(accelICMSquared);
     //if the launch sample is true, increaeing the detection, which counts how many consectutive times it is true. If not true, consectuve counts goes back to zero.
     if (launchSample) {
       if (launchDetectCount  < kLaunchDetectConsecutiveSamples) {
@@ -372,9 +354,11 @@ void loop(){
     //if the consective samples reach the needed amount, changing state to INFLIGHT
     if (launchDetectCount  >= kLaunchDetectConsecutiveSamples) {
       state = INFLIGHT;
-      inFlightStartTime  = millis(); //saving inflight start time
+      inflightStartTime  = millis(); //saving inflight start time
+      Serial.print(inflightStartTime);
       landingDetectCount  = 0; 
       //if the altitude is valid, saving it as both current and past altitude so change can start to be tracked
+
       if (altitudeValid) {
           previousAltitude  = currentAlt;
           currentAltitude  = currentAlt;
@@ -395,108 +379,23 @@ void loop(){
 
 
   case (INFLIGHT): {
-    if (inflightTimer  < kInflightUpdatePeriodMs) { //only updates every 30 ms
-    return;
-    }
 
-    //starting the logging again if needed (index == 0)
-    startFlightLoggingIfNeeded();
+  float timediff = millis() - inflightStartTime;
+  Serial.println(timediff);
+  if(timediff > 180000){
+    finishFlightLogging();
+    enterLandedState();
+    state = LANDED;
+  }
 
-
-    const uint32_t timeDiffInFlight = millis() - inFlightStartTime ;
-
-    //getting all sensor events needed for logging
-    sensors_event_t accel = getICM20649Accel(&icm);
-    sensors_event_t orient = getBNO055Event(& bno);
-    const float32_t altitude = getAltitude(&bmp);
-
-    //checking if sensor values are sane
-    const bool altitudeValid = altitudeIsSane(altitude);
-    const bool accelValid = accelVectorIsSane(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
-
-    //getting accel squared if valid
-    const float32_t accelSquared = accelValid ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z) : 0.0f;
-
-    //adding data to the flighData buffer to be stored in sd card
-    flightData.addFlightData(accel, orient, altitude, dataFile );
-
-    //if the current alt is valid and wasnt before, setting both current and past to the current alt, then setting has valid alt to true
-    if (altitudeValid) {
-      if (!hasValidInflightAltitude ) {
-        previousAltitude  = altitude;
-        currentAltitude  = altitude;
-        hasValidInflightAltitude  = true;
-    //if it valid and has had previuos valid alt, just saving current alt to current
-      } else {
-        currentAltitude  = altitude;
-      }
-    //threshold of consectuve counts cant be met if alt isnt valid
-    } else {
-      landingDetectCount  = 0;
-    }
-
-    //must be in flight for at least 5 seconds, this will be true after 5 seconds of inflight state
-    const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs;
-
-    //resetting landing sample to false
-    bool landingSample = false;
-
-    //if after 5 seconds, there is valid alt and accel, seeing if 
-    if (landingEvalArmed && altitudeValid && hasValidInflightAltitude && accelValid) {
-      //will be true if the difference in altitude is less than 0.5 meters (falling slowly)
-      const bool altLessThanHalfM = absScalarF32(currentAltitude  - previousAltitude ) <= kLandingAltitudeDeltaThresholdM;
-
-      //will be true is accel is less than 4
-      const bool lowAccel = accelSquared <= kLandingAccelThresholdSquared;
-
-      //will be true is accel is less than 4 and delta alt is less than 0.5
-      landingSample = altLessThanHalfM && lowAccel;
-    }
-
-    //if valid sample, and not yet at threshold, increasing consective samples. If not valid, resetting detection count
-    if (landingSample) {
-      if (landingDetectCount  < kLandingDetectConsecutiveSamples) {
-        landingDetectCount ++;
-      }
-    } else {
-      landingDetectCount  = 0;
-    }
-
-    //if after five seconds and the detection count gets to five, finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
-    if (landingEvalArmed && landingDetectCount  >= kLandingDetectConsecutiveSamples) {
-      finishFlightLogging();
-      enterLandedState();
-      topHits = 1;
-      return;
-
-    //if been in inflight for 3 mintutes finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
-    if (timeDiffInFlight > kInflightTimeoutMs) {
-      finishFlightLogging();
-      enterLandedState();
-      topHits  = 1;
-      return;
-    }
-
-    //saving current alt for next loop's last alt
-    if (altitudeValid && hasValidInflightAltitude ) {
-        previousAltitude  = currentAltitude ;
-      }
-    }
-    break;
-    }
-
-
+  break;
+  }
 
 
 
 
 
   case (LANDED): {
-    //if the 15 minutes have passed, just return to the program continues forever
-    if (landedFinalized) {
-      return;
-    }
-
     //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
     if (millis() - landedStartTime  >= kLandedTimeoutMs) {
       Serial.println("landed timeout reached, stopping all motors");
@@ -512,7 +411,6 @@ void loop(){
 
     startSoilLoggingIfNeeded();
     checkOrientationStep();
-    getAndLogSoilData();
 
     //switch logic
     upperSwitchPressed = (digitalReadFast(kUpperLimitSwitchPin) == HIGH); //true if the upper limit switch is currently pressed
@@ -524,60 +422,80 @@ void loop(){
     lastUpperSwitchPressed = upperSwitchPressed; //making last the current for next loop
     lastLowerSwitchPressed = lowerSwitchPressed;
 
-    if (isOriented){
-      switch(whereInLanded){
-        case(PLUNGE): {
-          augerMotor.moveMosfet();
-          leadScrewMotor.moveMotorBackward(kLeadScrewDutyCycle);
+    if(isOriented){
 
-          if(secondPlunge && ((millis() - waterMotorStartTime)<kWaterTimeoutMs)){
+    switch(stateOnGround){
+        case(PLUNGE): {
+            Serial.println("At top, drilling down and spinning auger");
+            augerMotor.moveMosfet();
+            leadScrewMotor.moveMotorBackward(kLeadScrewDutyCycle);
+
+            if(secondPlunge && ((millis() - waterMotorStartTime)<kWaterTimeoutMs)){
                 waterMotor.moveMotorBackward(kWaterDutyCycle);
             }
-          else {
-              waterMotor.stopMotorWithCoast();
-              waterGone = true;
-          }
+            else {
+                waterMotor.stopMotorWithCoast();
+            }
 
             if(lowerStateChange){
                 leadScrewMotor.stopMotorWithCoast();
-                augerMotor.moveMosfet();
-                whereInLanded = IDLE;
+                stateOnGround = IDLE;
                 idleStartTime = millis();
+                augerMotor.moveMosfet();
 
             }
-
         break;
         }
 
-        case(IDLE):{
-          if(millis() - idleStartTime >= 12000){
-          whereInLanded = RETRACT;
-          leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
+        case (IDLE): {
+            if(millis() - idleStartTime >= 12000){
+                upwardTravelStartTime = millis();
+                stateOnGround = RETRACT;
+                leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
             }
-
+            
         break;
         }
 
-        case (RETRACT):{
-            if(upperStateChange){
-                if(!secondPlunge && !waterGone){
-                  secondPlunge = true;
-                  waterMotorStartTime = millis();
-                }
-                //resetting all landed state variables after complete cycle
-                enterLandedState();
-                whereInLanded = PLUNGE;
+        case (RETRACT): {
+            if(millis() - upwardTravelStartTime >= 5000){
+                secondPlunge = true;
+                waterMotorStartTime = millis();
+                stateOnGround = PLUNGE;
                 
             }
-
+            
         break;
         }
 
-        default: {
+        default:{
         break;
         }
+
+    }
+    }
+
+    static elapsedMillis soilTimer; //starts the timer for soilTimer
+    if (soilTimer > 2000) { // Read every 2 seconds
+      float32_t raw;
+
+      //getting pH, eletrical conductivity, and nitrogen content
+      if (readRegister(0x0006, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
+        pH  = raw/100.0f;
+      }
+      if (readRegister(0x0015, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
+        electricalConductivity  = raw;
 
       }
+      if (readRegister(0x001E, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
+        nitrogenMgKg  = raw;
+      }
+
+      //adding data to the soil data file
+      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
+
+      //resetting the soilTimer
+      soilTimer = 0;
     }
 
     //just making sure the state staying in landed
