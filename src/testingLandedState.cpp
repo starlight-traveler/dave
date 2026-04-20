@@ -64,6 +64,7 @@ HardwareSerial &modbus = Serial1;
   bool lowerStateChange = false;
 
   bool isMovingUp = false;
+  bool isOriented = false;
 
   bool waterDispensed = false;
   bool waterGone = false;
@@ -115,44 +116,30 @@ void enterLandedState() {
 
 
 void checkOrientationStep() {
-  if (orientationAligned ) {
-    return;
-  }
+    //getting the gravity vector from bno
+    const imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
+    const float32_t gravityZ = gravity.z();
 
-  const imu::Vector<3> gravity =  bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
-  const float32_t gravityX = gravity.x();
-  const float32_t gravityY = gravity.y();
-  const float32_t gravityZ = gravity.z();
-  if (!accelVectorIsSane(gravityX, gravityY, gravityZ)) {
-    static elapsedMillis invalidGravityLogTimer;
-    if (invalidGravityLogTimer >= kOrientationLogPeriodMs) {
-      invalidGravityLogTimer = 0;
-      Serial.println("[FC][LANDED][ORIENT] gravity invalid, skipping orientation step");
+    sensors_event_t event = getBNO055Event(&bno);
+    float orientY = event.orientation.y;
+
+    //if the y axis is within the needed range, stopping the motor and setting the orientMotor to true as it was aligned properly and returning to main program
+    if(orientY<kOrientationAlignedYMin){
+    orientMotor.moveMotorForward(kOrientationDutyCycle);
+    isOriented = false;
+    } // || gravityZ<-3.0
+    else if (orientY>kOrientationAlignedYMin){
+    orientMotor.moveMotorBackward(kOrientationDutyCycle);
+    isOriented = false;
     }
+    if(orientY>kOrientationAlignedYMin && orientY<kOrientationAlignedYMax && gravityZ > 0.0){
     orientMotor.stopMotorWithCoast();
+    isOriented = true;
+    Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
-  }
+    }
 
-  static elapsedMillis orientLogTimer;
-  if (orientLogTimer >= kOrientationLogPeriodMs) {
-    orientLogTimer = 0;
-
-  }
-
-  if (gravityY <= kOrientationAlignedYMax &&
-     gravityY >= kOrientationAlignedYMin) {
-    orientMotor.stopMotorWithCoast();
-    orientationAligned  = true;
-    Serial.println("[FC][LANDED][ORIENT] z-axis aligned -> orientation complete");
-    return;
-  }
-
-  if (orientationTimer  >= kOrientationTimeoutMs) { // do we think 5 seconds is enough time?
-    orientMotor.stopMotorWithCoast();
-    orientationAligned  = true;
-    Serial.println("[FC][LANDED][ORIENT] orientation timeout -> stopping motor");
-  }
-}
+    }
 
 void startSoilLoggingIfNeeded() {
   if (soilData.getCurrentIndex() == 0) {

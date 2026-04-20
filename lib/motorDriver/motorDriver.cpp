@@ -16,9 +16,13 @@ int dutyToPwm(float dutyCycle) {
 //https://www.ti.com/lit/ds/symlink/drv8244-q1.pdf?ts=1701345632184
 //https://www.ti.com/lit/ds/symlink/drv8212p.pdfint
 
-motorDriver::motorDriver(int gpio){
-    IN1 = gpio;
-    pinMode(IN1, OUTPUT);
+motorDriver::motorDriver(int dir, int pwm, int currentSense, bool pololu){
+    dirPin = dir;
+    pwmPin = pwm;
+    csPin = currentSense;
+    pinMode(dirPin, OUTPUT);
+    pinMode(pwmPin, OUTPUT);
+    pinMode(csPin, INPUT);
 }
 
 motorDriver::motorDriver(int in1, int in2, int nSleep){
@@ -80,12 +84,26 @@ motorDriver::motorDriver(int in1, int in2, int nSleep, int nfault, int drvoff){
     }
 }
 
-void motorDriver::moveMosfet(){
-    digitalWrite(IN1, HIGH);
+void motorDriver::moveForwardPololu(){
+    digitalWrite(dirPin, HIGH);
+    digitalWrite(pwmPin, HIGH);
+
 }
 
-void motorDriver::stopMosfet(){
-    digitalWrite(IN1, LOW);
+void motorDriver::moveBackwardPololu(){
+    digitalWrite(dirPin, LOW);
+    digitalWrite(pwmPin, HIGH);
+
+}
+
+void motorDriver::stopPololu(){
+    digitalWrite(pwmPin, LOW);
+}
+
+float motorDriver::getCurrentSensePololu(){
+    float voltageProportational = digitalRead(csPin);
+    return voltageProportational;
+
 }
 
 //this function will cause the motor to move forward

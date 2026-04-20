@@ -39,6 +39,31 @@ void finishSoilLogging() {
   soilData.printSoilDataToFile(dataFile );
 }
 
+void getAndLogSoilData(){
+    static elapsedMillis soilTimer; //starts the timer for soilTimer
+    if (soilTimer > kSoilDataRequestPeriodMs) { // Read every 30 milliseconds seconds
+      float32_t raw;
+
+      //getting pH, eletrical conductivity, and nitrogen content
+      if (readRegister(0x0006, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
+        pH  = raw/100.0f;
+      }
+      if (readRegister(0x0015, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
+        electricalConductivity  = raw;
+
+      }
+      if (readRegister(0x001E, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
+        nitrogenMgKg  = raw;
+      }
+
+      //adding data to the soil data file
+      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
+
+      //resetting the soilTimer
+      soilTimer = 0;
+    }
+  }
+
 }
 
 void setup(){
@@ -71,28 +96,12 @@ void setup(){
 
 void loop(){
     startSoilLoggingIfNeeded();
+    getAndLogSoilData();
 
-      float32_t raw;
-
-      if (readRegister(0x0006, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
-        pH  = raw/100.0f;
-      }
-      if (readRegister(0x0015, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
-        electricalConductivity  = raw;
-
-      }
-      if (readRegister(0x001E, raw, RS485_DIR_PIN, SLAVE_ID, modbus)) {
-        nitrogenMgKg  = raw;
-      }
-
-      soilData.addSoilSensorData(nitrogenMgKg , pH , electricalConductivity , dataFile);
-      
-      delay(200);
-
-      if(millis() - startTime>60000){
-        finishSoilLogging();
-        Serial.print("Done");
-        while(1){}
-      }
-
+    if(millis() - startTime>60000){
+      finishSoilLogging();
+      Serial.print("Done");
+      while(1){}
     }
+
+  }
