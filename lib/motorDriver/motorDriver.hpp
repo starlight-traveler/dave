@@ -24,7 +24,7 @@ class motorDriver {
         //other functions
         void moveForwardPololu();
         void moveBackwardPololu();
-        float getCurrentSensePololu();
+        int getCurrentSensePololu();
         void stopPololu();
         void moveMotorForward(float dutyCycle);
         void moveMotorBackward(float dutyCycle);

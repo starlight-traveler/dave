@@ -100,8 +100,8 @@ void motorDriver::stopPololu(){
     digitalWrite(pwmPin, LOW);
 }
 
-float motorDriver::getCurrentSensePololu(){
-    float voltageProportational = digitalRead(csPin);
+int motorDriver::getCurrentSensePololu(){
+    int voltageProportational = analogRead(csPin);
     return voltageProportational;
 
 }

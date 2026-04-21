@@ -7,28 +7,24 @@
 #include "motorDriver.hpp"
 #include "Constants.hpp"
 
-motorDriver augerMotor = motorDriver(kAugerControlPin);
+motorDriver augerMotor = motorDriver(41, 12, 40, true);
 
-void setup(){
+void setup()
+{
     Serial.begin(9600);
-    Serial.println("Started Serial");
-
-    augerMotor = motorDriver(kAugerControlPin);
-    augerMotor.stopMosfet();
-    Serial.print("Pulling low...");
-
-    delay(2000);
-
+    augerMotor.stopPololu();
 }
 
-void loop(){
-    augerMotor.moveMosfet();
-    Serial.print("moving forward");
-
-    delay(6000);
-
-    augerMotor.stopMosfet();
-
-    delay(6000);
-
+void loop()
+{
+    augerMotor.moveBackwardPololu();
+    // backward = pull dirt up into chamber
+    int current = augerMotor.getCurrentSensePololu();
+    Serial.println(current);
+    //augerMotor.moveForwardPololu();
+    // forward = run auger in reverse, push dirt out
+    //delay(5000);
+    // supposedly max current sense is at ~250mV (50mV + 10mV/A * 20A)
+    // analog read will supposedly return ~77 if current is at max
+    delay(200);
 }
