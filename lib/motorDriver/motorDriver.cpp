@@ -103,7 +103,6 @@ void motorDriver::stopPololu(){
 int motorDriver::getCurrentSensePololu(){
     int voltageProportational = analogRead(csPin);
     return voltageProportational;
-
 }
 
 //this function will cause the motor to move forward

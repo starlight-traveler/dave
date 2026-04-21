@@ -18,23 +18,29 @@
 HardwareSerial &modbus = Serial1;
 
 //defining states for flight
-  enum FlightState {
+  enum FlightState 
+  {
     PREFLIGHT,
     INFLIGHT,
+    GROUND,
     LANDED,
+    SHUTDOWN
   };
 
 //defining states for landed state
-  enum LandedState { 
+  enum LandedState 
+  { 
     PLUNGE,
     REVERSE,
     IDLE, 
-    RETRACT
+    RETRACT,
+    FULL_RETRACT
   };
 
 //creating motor objects
   motorDriver orientMotor  = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
-  motorDriver augerMotor = motorDriver(kAugerPWMPin, kAugerDIRPin, kAugerCurrentSensePin, true);
+  //motorDriver augerMotor = motorDriver(kAugerDIRPin, kAugerPWMPin, kAugerCurrentSensePin, true);
+  motorDriver augerMotor = motorDriver(41, 12, 40, true);
   motorDriver leadScrewMotor  = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
   motorDriver waterMotor  = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
@@ -48,17 +54,20 @@ HardwareSerial &modbus = Serial1;
 
   FlightState state = PREFLIGHT; //initializng state
   LandedState whereInLanded = PLUNGE;
+  LandedState prevLandedState;
 
 //initalizing time markers
   float inFlightStartTime  = 0;
   float landedStartTime  = 0;
   float waterMotorStartTime = 0;
-  float idleStartTime = 0;
-  float sliceStartTime = 0;
-  float landedStartTimeAlt = 0;
-  float draggedDelayStartTime = 0;
-  float plungeStartTime = 0;
-  float retractStartTime = 0;
+  int idleStartTime = 0;
+  int sliceStartTime = 0;
+  int landedStartTimeAlt = 0;
+  int draggedDelayStartTime = 0;
+  int plungeStartTime = 0;
+  int retractStartTime = 0;
+  int fullRetractStartTime = 0;
+  int reverseStartTime = 0;
 
 //varaibles to hold fetched soil sensor data
   float32_t nitrogenMgKg = 0.0f;
@@ -112,7 +121,8 @@ HardwareSerial &modbus = Serial1;
 //------------------------------------------------------ SANITY CHECKS AND MATHMATICAL SENSOR DATA FUNCTIONS ------------------------------------------------------
 
 /*This function will return the absolute value of val*/
-float32_t absScalarF32(float32_t val) {
+float32_t absScalarF32(float32_t val) 
+{
   float32_t src[1] = {val};
   float32_t dst[1] = {0.0f};
   arm_abs_f32(src, dst, 1);
@@ -120,24 +130,28 @@ float32_t absScalarF32(float32_t val) {
 }
 
 /*This function will return true if the acceleration value inputted is finite and the absolute value is under 1500 m/s^2*/
-bool isFiniteAndReasonable(float32_t value) {
+bool isFiniteAndReasonable(float32_t value) 
+{
   return __builtin_isfinite(value) && absScalarF32(value) <= kAccelSanityMaxAbsMs2;
 }
 
 /*This function will return true if the acceleration componants inputted are all finite and reasonable*/
-bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) {
+bool accelVectorIsSane(float32_t x, float32_t y, float32_t z) 
+{
   return isFiniteAndReasonable(x) && isFiniteAndReasonable(y) && isFiniteAndReasonable(z);
 }
 
 /*This function will return true if the altitude passed is finite, greater than -500 and less than 100,000 m*/
-bool altitudeIsSane(float32_t altitudeM) {
+bool altitudeIsSane(float32_t altitudeM) 
+{
   return __builtin_isfinite(altitudeM) &&
          altitudeM >= kAltitudeValidMinM &&
          altitudeM <= kAltitudeValidMaxM;
 }
 
 /*This funcntion will return the magnitude squared of a 3d vector*/
-float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
+float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) 
+{
   float32_t vec[3] = {x, y, z};
   float32_t magnitudeSquared = 0.0f;
   arm_dot_prod_f32(vec, vec, 3, &magnitudeSquared);
@@ -147,7 +161,8 @@ float32_t squaredMagnitude(float32_t x, float32_t y, float32_t z) {
 //------------------------------------------------------ LANDED STATE CHANGE/INITIALIZATION FUNCTION ------------------------------------------------------
 
 /*This function will reset all vairables needed when entering the landed state, as well as log the landed state start time*/
-void enterLandedState() {
+void enterLandedState() 
+{
   state = LANDED;
   landedStartTime  = millis();
 
@@ -166,12 +181,12 @@ void enterLandedState() {
   lowerStateChange = false;
   secondPlunge = false;
   isBeingDragged = true;
-
 }
 
 // - delay up t 10 minutes while being dragged when entering landed state
-
-void delayIfDragged(){
+// implement this logic in the GROUND state
+void delayIfDragged()
+{
   //in italizng the start time of checking if being dragged
     draggedDelayStartTime = millis();
     sensors_event_t event;
@@ -199,7 +214,8 @@ void delayIfDragged(){
 //------------------------------------------------------ ORIENTATION FUNCTION ------------------------------------------------------
 
 
-void checkOrientationStep() {
+void checkOrientationStep() 
+{
     //getting the gravity vector from bno
     const imu::Vector<3> gravity = bno.getVector(Adafruit_BNO055::VECTOR_GRAVITY);
     const float32_t gravityZ = gravity.z();
@@ -223,8 +239,7 @@ void checkOrientationStep() {
     //Serial.println("[LANDED][ORIENT] y-axis aligned -> orientation complete");
     return;
     }
-
-    }
+}
 
 
 
@@ -362,6 +377,12 @@ void shutdownDave(){
     landedFinalized  = true;
 }
 
+// timer management helper function
+bool isTimeUp(uint32_t startTime, uint32_t threshhold)
+{
+  return (millis() - startTime) > threshhold;
+}
+
 /*-------------------------------SETUP---------------------------------------------*/
 
 void setup()
@@ -383,7 +404,8 @@ void setup()
 
   //intializing the motors inside the setup
   orientMotor = motorDriver(kOrientMotorIn1, kOrientMotorIn2, kOrientMotorSleep);
-  augerMotor = motorDriver(kAugerPWMPin, kAugerDIRPin, kAugerCurrentSensePin, true);
+  //augerMotor = motorDriver(kAugerPWMPin, kAugerDIRPin, kAugerCurrentSensePin, true);
+  augerMotor = motorDriver(41, 12, 40, true);
   leadScrewMotor = motorDriver(kLeadScrewMotorIn1, kLeadScrewMotorIn2, kLeadScrewMotorSleep);
   waterMotor = motorDriver(kWaterMotorIn1, kWaterMotorIn2, kWaterMotorSleep);
 
@@ -433,7 +455,8 @@ void loop()
   //checking sensor connections
   checkSensorConnections();
 
-  switch (state){
+  switch (state)
+  {
     //only update and go thorugh the preflight loop every 50 ms
     case(PREFLIGHT): 
     {
@@ -533,6 +556,8 @@ void loop()
     //getting accel squared if valid, if not set to zero
     //const float32_t accelSquared = accelValid ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z) : 0.0f;
 
+    // Do we remove flight altitude stuff for safety????
+
     //if the current alt is valid and wasnt before, setting both current and past to the current alt, then setting has valid alt to true
     if (altitudeValid) 
     {
@@ -600,10 +625,11 @@ void loop()
     Serial.println(timeDiffInFlight);
 
     //if been in inflight for 3 mintutes finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
-    if (timeDiffInFlight > kInflightTimeoutMs) 
+    if (isTimeUp(inFlightStartTime, kInflightTimeoutMs)) 
     {
       finishFlightLogging();
-      enterLandedState();
+      state = GROUND;
+      Serial.println("Switching!");
       return;
     }
 
@@ -616,108 +642,181 @@ void loop()
     break;
   }
 
+  case (GROUND):
+  {
+    // TODO: Implement the anti-dragging logic here
+    Serial.println("GROUND");
+    state = LANDED;
+  }
 
   case (LANDED): 
   {
-    //Serial.println("LANDED");
+    Serial.println("LANDED");
 
     //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
     if (millis() - landedStartTime  >= kLandedTimeoutMs) 
     {
       Serial.println("landed timeout reached, stopping all motors");
       shutdownDave();
-    }
+    }   
+    //delayIfDragged();
+    controlWaterPump();
+    // code logic to put elsewhere ^
 
-
-    
-    delayIfDragged();
     startSoilLoggingIfNeeded();
     checkOrientationStep();
     getAndLogSoilData();
     updateLimitSwitches();
-    controlWaterPump();
+    uint32_t current = augerMotor.getCurrentSensePololu();
 
     if(isOriented)
     {
       switch(whereInLanded)
       {
         case(PLUNGE):
-          augerMotor.stopPololu();
+        {
+          Serial.println("Plunge");
+          augerMotor.moveBackwardPololu();
           leadScrewMotor.moveMotorBackward(kLeadScrewDutyCycle);
+
+          if(current > kCurrentThresh)
+          {
+            prevLandedState = whereInLanded;
+            whereInLanded = REVERSE;
+          }
 
           if(isFirstPlunge)
           {
             isFirstPlunge = !isFirstPlunge;
-            sliceStartTime = millis();
+            plungeStartTime = millis();
           }
 
-          if(millis()-sliceStartTime>kPlungePeriod)
+          if(isTimeUp(plungeStartTime, kPlungePeriod))
           {
-            whereInLanded = REVERSE;
-            sliceStartTime = millis();
+            whereInLanded = RETRACT;
+            reverseStartTime = millis();
           }
 
-          if(lowerStateChange)
+          if(lowerSwitchPressed)
           {
             leadScrewMotor.stopMotorWithCoast();
             whereInLanded = IDLE;
             idleStartTime = millis();
           }
 
-          if((millis() - plungeStartTime) > kPlungeTimeToBottomLimit){
-            whereInLanded = RETRACT;
-            retractStartTime = millis();
+          if(isTimeUp(plungeStartTime, kPlungeTimeToBottomLimit))
+          {
+            whereInLanded = FULL_RETRACT;
+            fullRetractStartTime = millis();
           }
 
           break;
-
+        }
 
         case(REVERSE):
-          leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
-          if(millis()-sliceStartTime>kReversePeriod)
+        {
+          // this the complicated one where we reverse the thing and then go back to the old state
+          augerMotor.moveForwardPololu();
+          leadScrewMotor.stopMotorWithCoast();
+          if(isTimeUp(reverseStartTime, kReversePeriod))
           {
-            whereInLanded = PLUNGE;
-            sliceStartTime = millis();
+            whereInLanded = prevLandedState;
+            switch(whereInLanded)
+            {
+              case(PLUNGE):
+                plungeStartTime = millis();
+                break;
+              case(RETRACT):
+                retractStartTime = millis();
+                break;
+              case(IDLE):
+                idleStartTime = millis();
+                break;
+              case(FULL_RETRACT):
+                fullRetractStartTime = millis();
+                break;
+              case(REVERSE):
+                break;
+            }
           }
           break;
+        }
 
         case(IDLE):
-          augerMotor.stopPololu();
-          if(millis() - idleStartTime >= kAugerSpinDurationMs) // this should be changed to a variable
+        {
+          augerMotor.moveBackwardPololu();
+          leadScrewMotor.stopMotorWithCoast();
+
+          if(current > kCurrentThresh)
           {
-            whereInLanded = RETRACT;
+            prevLandedState = whereInLanded;
+            whereInLanded = REVERSE;
+          }
+
+          if(isTimeUp(idleStartTime, kAugerSpinDurationMs)) // this should be changed to a variable
+          {
+            whereInLanded = FULL_RETRACT;
             leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
-            retractStartTime = millis();
+            fullRetractStartTime = millis();
           }
           break;
-
+        }
 
         case(RETRACT):
+        {
           leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
-          augerMotor.stopPololu();
-          if(upperStateChange)
+          augerMotor.moveBackwardPololu();
+
+          if(current > kCurrentThresh)
           {
-            //resetting all landed state variables after complete cycle
-            firstPlungeComplete = true;
-            upperSwitchPressed = false;
-            lowerSwitchPressed = false;
-            lastUpperSwitchPressed = false;
-            lastLowerSwitchPressed = false;
-            upperStateChange = false;
-            lowerStateChange = false;
-            secondPlunge = false;
+            prevLandedState = whereInLanded;
+            whereInLanded = REVERSE;
+          }
+
+          if(isTimeUp(retractStartTime, kRetractPeriod))
+          {
+            whereInLanded = PLUNGE;
             plungeStartTime = millis();
-            whereInLanded = PLUNGE;            
           }
 
-          if(millis() - retractStartTime >= kRetractTimeToTopLimit){
-            Serial.println("Top limit switch not hit after 35 seconds.. shutting down");
-            shutdownDave();
+          if(isTimeUp(retractStartTime, kRetractTimeToTopLimit))
+          {
+           whereInLanded = PLUNGE;
+           plungeStartTime = millis();
+           // maybe make this go to reverse and then shutdown?
           }
-
           break;
+        }
+
+        case(FULL_RETRACT):
+        {
+          augerMotor.moveBackwardPololu(); // maybe this should be the other way?
+          leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
+
+          if(current > kCurrentThresh)
+          {
+            prevLandedState = whereInLanded;
+            whereInLanded = REVERSE;
+          }
+
+          if(upperSwitchPressed)
+          {
+            whereInLanded = PLUNGE;
+            plungeStartTime = millis();
+          }
+
+          if(isTimeUp(fullRetractStartTime, kRetractTimeToTopLimit))
+          {
+            whereInLanded = PLUNGE;
+            plungeStartTime = millis();
+            // maybe change the logic here
+          }
+        }
+          
         default:
+        {
           break;
+        }
       }
     }
     else
@@ -728,8 +827,15 @@ void loop()
     break;
   }
 
+  case (SHUTDOWN):
+  {
+    // implement this in a bit
+  }
+
   default:
-  return;
+  {
+    break;
+  }
 
   }
 
