@@ -101,8 +101,8 @@ HardwareSerial &modbus = Serial1;
   bool secondPlunge = false;
   bool isOriented = false;
   bool landedFinalized = false;
-  bool isFirstPlunge = true;
-  bool firstPlungeComplete = false;
+  bool waterDeploy = false;
+  bool isFirstPlunge = false;
   bool isBeingDragged = true;
 
   //timers for state change tracking
@@ -345,7 +345,7 @@ void updateLimitSwitches()
 
 void controlWaterPump()
 {
-  if(firstPlungeComplete)
+  if(waterDeploy)
   {
     if(waterMotorStartTime == 0)
     {
@@ -354,7 +354,7 @@ void controlWaterPump()
       Serial.println("Water motor time reset");
     }
     Serial.println(millis()-waterMotorStartTime);
-    if(millis()-waterMotorStartTime>kWaterTimeoutMs)
+    if((millis()-waterMotorStartTime)>kWaterTimeoutMs)
     {
       waterMotor.stopMotorWithCoast();
     }
@@ -789,6 +789,10 @@ void loop()
 
         case(FULL_RETRACT):
         {
+          if (!waterDeploy){
+            waterDeploy = true;
+          }
+          
           augerMotor.moveBackwardPololu(); // maybe this should be the other way?
           leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
 
