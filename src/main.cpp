@@ -447,10 +447,6 @@ void setup()
 void loop()
 {
 
-  if (landedFinalized) 
-  {
-    return;
-  }
 
   //checking sensor connections
   checkSensorConnections();
@@ -654,10 +650,10 @@ void loop()
     Serial.println("LANDED");
 
     //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
-    if (millis() - landedStartTime  >= kLandedTimeoutMs) 
+    if (isTimeUp(landedStartTime, kLandedTimeoutMs)) 
     {
       Serial.println("landed timeout reached, stopping all motors");
-      shutdownDave();
+      state = SHUTDOWN;
     }   
     //delayIfDragged();
     controlWaterPump();
@@ -829,6 +825,21 @@ void loop()
 
   case (SHUTDOWN):
   {
+    updateLimitSwitches();
+
+    if(upperSwitchPressed)
+    {
+      leadScrewMotor.stopMotorWithCoast();
+      augerMotor.stopPololu();
+      delay(50);
+      return;
+    }
+    else
+    {
+      leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
+      augerMotor.moveForwardPololu();
+    }
+
     // implement this in a bit
   }
 
