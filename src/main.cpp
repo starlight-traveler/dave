@@ -642,6 +642,7 @@ void loop()
   {
     // TODO: Implement the anti-dragging logic here
     Serial.println("GROUND");
+    landedStartTime = millis();
     state = LANDED;
   }
 
@@ -654,6 +655,8 @@ void loop()
     {
       Serial.println("landed timeout reached, stopping all motors");
       state = SHUTDOWN;
+      finishSoilLogging();
+      return;
     }   
     //delayIfDragged();
     controlWaterPump();
@@ -819,7 +822,6 @@ void loop()
     {
       leadScrewMotor.stopMotorWithCoast();
     }
-    state = LANDED;
     break;
   }
 
@@ -831,8 +833,9 @@ void loop()
     {
       leadScrewMotor.stopMotorWithCoast();
       augerMotor.stopPololu();
+      waterMotor.stopMotorWithCoast();
+      orientMotor.stopMotorWithCoast();
       delay(50);
-      return;
     }
     else
     {
