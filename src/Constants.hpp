@@ -63,11 +63,12 @@ const float32_t kDraggedAccelThresholdSquared = 4.0f;
  const  uint32_t kSwitchPollPeriodMs = 5;                   // Limit switch polling interval (milliseconds).
  const  uint32_t kSensorHealthPollMs = 2000;                // Sensor connectivity/health check interval (milliseconds).
  const  uint32_t kWaterTimeoutMs = 90000;                   // the time water will run before stopping
- const uint32_t kRetractPeriod = 1500;                      // how long to retract for (usually 1/2 plunge time)
-  const uint32_t kPlungePeriod = 3000;                      // how long to plunge for
- const uint32_t kPlungeTimeToBottomLimit = 10000; // 10 seconds
-const uint32_t kRetractTimeToTopLimit = 25000; //25 seconds
-const uint32_t kReversePeriod = 3000;           // period of reversing auger when jammed
+ const uint32_t kRetractPeriod = 2000;                      // how long to retract for (usually 1/2 plunge time)
+ const uint32_t kPlungePeriod = 3000;                      // how long to plunge for
+ const uint32_t kPlungeTimeToBottomLimit = 10000;           // 10 seconds
+ const uint32_t kRetractTimeToTopLimit = 25000;              //25 seconds
+ const uint32_t kReversePeriod = 3000;                       // period of reversing auger when jammed
+ const uint32_t kGroundPeriod = 480000;                      // time to wait on ground until deploy anyways (8min)
 // -------------------- Motion Tuning --------------------
  const float32_t kLeadScrewDutyCycle = 1.0f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).
  const  float32_t kWaterDutyCycle = 1.0f;                  // Water motor PWM duty cycle (0.0 to 1.0).

@@ -353,7 +353,7 @@ void controlWaterPump()
       waterMotor.moveMotorBackward(kWaterDutyCycle);
       Serial.println("Water motor time reset");
     }
-    Serial.println(millis()-waterMotorStartTime);
+    //Serial.println(millis()-waterMotorStartTime);
     if((millis()-waterMotorStartTime)>kWaterTimeoutMs)
     {
       waterMotor.stopMotorWithCoast();
@@ -553,7 +553,7 @@ void loop()
     //const float32_t accelSquared = accelValid ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z) : 0.0f;
 
     // Do we remove flight altitude stuff for safety????
-
+    /*
     //if the current alt is valid and wasnt before, setting both current and past to the current alt, then setting has valid alt to true
     if (altitudeValid) 
     {
@@ -617,24 +617,26 @@ void loop()
       Serial.print("Landed start time from alitmeter (from beginning of program): ");
       Serial.println(landedDetectedFromAlt);
     }
-
+    */
     Serial.println(timeDiffInFlight);
+
 
     //if been in inflight for 3 mintutes finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
     if (isTimeUp(inFlightStartTime, kInflightTimeoutMs)) 
     {
       finishFlightLogging();
       state = GROUND;
+      landedStartTime = millis();
       Serial.println("Switching!");
       return;
     }
-
+    /*
     //saving current alt for next loop's last alt
     if (altitudeValid && hasValidInflightAltitude) 
     {
       previousAltitude  = currentAltitude;
     }
-
+    */
     break;
   }
 
@@ -642,7 +644,11 @@ void loop()
   {
     // TODO: Implement the anti-dragging logic here
     Serial.println("GROUND");
-    landedStartTime = millis();
+    if(isTimeUp(landedStartTime, kGroundPeriod))
+    {
+      state = LANDED;
+    }
+
     state = LANDED;
   }
 
@@ -659,9 +665,8 @@ void loop()
       return;
     }   
     //delayIfDragged();
-    controlWaterPump();
-    // code logic to put elsewhere ^
 
+    controlWaterPump();
     startSoilLoggingIfNeeded();
     checkOrientationStep();
     getAndLogSoilData();
