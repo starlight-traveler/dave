@@ -24,7 +24,8 @@ HardwareSerial &modbus = Serial1;
     INFLIGHT,
     GROUND,
     LANDED,
-    SHUTDOWN
+    SHUTDOWN,
+    E_SHUTDOWN
   };
 
 //defining states for landed state
@@ -115,6 +116,11 @@ HardwareSerial &modbus = Serial1;
   //auger movement timers
   elapsedMillis augerMovingDown;
   elapsedMillis augerMovingUp;
+
+  // stall trackers
+  int leadScrewStalls = 0;
+  int augerStalls = 0;
+  uint32_t downTravelStartTime = 0;
 /*---------------------------------------------------------------------------FUNCTIONS-------------------------------------------------------------------------*/
 
 
@@ -353,26 +359,6 @@ void updateLimitSwitches()
 
 void controlWaterPump()
 {
-  /*
-  if(waterDeploy)
-  {
-    if(waterMotorStartTime == 0)
-    {
-      waterMotorStartTime = millis();
-      waterMotor.moveMotorBackward(kWaterDutyCycle);
-      Serial.println("Water motor time reset");
-    }
-    //Serial.println(millis()-waterMotorStartTime);
-    if((millis()-waterMotorStartTime)>kWaterTimeoutMs)
-    {
-      waterMotor.stopMotorWithCoast();
-    }
-  }
-  else
-  {
-    waterMotor.stopMotorWithCoast();
-  }
-  */
   if(waterDeploy && !isTimeUp(waterMotorStartTime, kWaterTimeoutMs))
   {
     waterMotor.moveMotorBackward(kWaterDutyCycle);
@@ -603,8 +589,15 @@ void loop()
     checkOrientationStep();
     getAndLogSoilData();
     updateLimitSwitches();
-    uint32_t current = augerMotor.getCurrentSensePololu();
 
+    if((leadScrewStalls > 5) || (augerStalls > 5))
+    {
+      state = E_SHUTDOWN;
+      return;
+    }
+
+    uint32_t current = augerMotor.getCurrentSensePololu();
+    Serial.println(current);
     if(isOriented)
     {
       switch(whereInLanded)
@@ -620,12 +613,16 @@ void loop()
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
             reverseStartTime = millis();
+            augerStalls++;
           }
+
+          augerStalls = 0;
 
           if(isFirstPlunge)
           {
             isFirstPlunge = false;
             plungeStartTime = millis();
+            downTravelStartTime = millis();
           }
 
           if(isTimeUp(plungeStartTime, kPlungePeriod))
@@ -634,17 +631,20 @@ void loop()
             retractStartTime = millis();
           }
 
-          if(lowerSwitchPressed)
+          if(lowerStateChange && lastLowerSwitchPressed == LOW)
           {
+            Serial.println("Lower switch pressed");
             leadScrewMotor.stopMotorWithCoast();
             whereInLanded = IDLE;
             idleStartTime = millis();
+            leadScrewStalls = 0;
           }
 
-          if(isTimeUp(plungeStartTime, kPlungeTimeToBottomLimit))
+          if(isTimeUp(downTravelStartTime, kPlungeTimeToBottomLimit))
           {
             whereInLanded = FULL_RETRACT;
             fullRetractStartTime = millis();
+            leadScrewStalls++;
           }
 
           break;
@@ -652,6 +652,7 @@ void loop()
 
         case(REVERSE):
         {
+          Serial.println("reverse");
           // this the complicated one where we reverse the thing and then go back to the old state
           augerMotor.moveForwardPololu();
           leadScrewMotor.stopMotorWithCoast();
@@ -681,6 +682,7 @@ void loop()
 
         case(IDLE):
         {
+          Serial.println("idle");
           augerMotor.moveBackwardPololu();
           leadScrewMotor.stopMotorWithCoast();
 
@@ -689,7 +691,10 @@ void loop()
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
             reverseStartTime = millis();
+            augerStalls++;
           }
+
+          augerStalls = 0;
 
           if(isTimeUp(idleStartTime, kAugerSpinDurationMs)) // this should be changed to a variable
           {
@@ -702,6 +707,7 @@ void loop()
 
         case(RETRACT):
         {
+          Serial.println("retract");
           leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
           augerMotor.moveBackwardPololu();
 
@@ -710,7 +716,10 @@ void loop()
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
             reverseStartTime = millis();
+            augerStalls++;
           }
+
+          augerStalls = 0;
 
           if(isTimeUp(retractStartTime, kRetractPeriod))
           {
@@ -718,17 +727,28 @@ void loop()
             plungeStartTime = millis();
           }
 
-          if(isTimeUp(retractStartTime, kRetractTimeToTopLimit))
+          if(isTimeUp(downTravelStartTime, kRetractTimeToTopLimit))
           {
            whereInLanded = PLUNGE;
            plungeStartTime = millis();
+           leadScrewStalls++;
            // maybe make this go to reverse and then shutdown?
           }
+
+          if(upperStateChange && lastUpperSwitchPressed == LOW)
+          {
+            whereInLanded = PLUNGE;
+            plungeStartTime = millis();
+            leadScrewStalls = 0;
+            Serial.println("Upper switch pressed!");
+          }
+
           break;
         }
 
         case(FULL_RETRACT):
         {
+          Serial.println("full retract");
           if (!waterDeploy)
           {
             waterDeploy = true;
@@ -743,18 +763,25 @@ void loop()
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
             reverseStartTime = millis();
+            augerStalls++;
           }
+
+          augerStalls = 0;
 
           if(upperSwitchPressed)
           {
             whereInLanded = PLUNGE;
             plungeStartTime = millis();
+            leadScrewStalls = 0;
+            downTravelStartTime = millis();
+            Serial.println("Upper switch pressed!");
           }
 
           if(isTimeUp(fullRetractStartTime, kRetractTimeToTopLimit))
           {
             whereInLanded = PLUNGE;
             plungeStartTime = millis();
+            leadScrewStalls++;
             // maybe change the logic here
           }
         }
@@ -776,7 +803,7 @@ void loop()
   {
     updateLimitSwitches();
 
-    if(upperSwitchPressed)
+    if(upperStateChange && lastUpperSwitchPressed == LOW)
     {
       leadScrewMotor.stopMotorWithCoast();
       augerMotor.stopPololu();
@@ -791,6 +818,15 @@ void loop()
       augerMotor.moveForwardPololu();
     }
 
+  }
+
+  case(E_SHUTDOWN):
+  {
+    leadScrewMotor.stopMotorWithCoast();
+    augerMotor.stopPololu();
+    waterMotor.stopMotorWithCoast();
+    orientMotor.stopMotorWithCoast();
+    delay(50);
   }
 
   default:
