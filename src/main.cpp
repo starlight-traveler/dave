@@ -102,7 +102,7 @@ HardwareSerial &modbus = Serial1;
   bool isOriented = false;
   bool landedFinalized = false;
   bool waterDeploy = false;
-  bool isFirstPlunge = false;
+  bool isFirstPlunge = true;
   bool isBeingDragged = true;
 
   //timers for state change tracking
@@ -327,6 +327,14 @@ void checkSensorConnections()
   checkICMConnection(&icm);
 }
 
+//------------------------------------------------ TIMER HELPER FUNCTION -------------------------------------
+
+// timer management helper function
+bool isTimeUp(uint32_t startTime, uint32_t threshhold)
+{
+  return (millis() - startTime) > threshhold;
+}
+
 //--------------------------------------------------- LIMIT SWITCH CHECKER ------------------------------------------------
 
 void updateLimitSwitches()
@@ -345,6 +353,7 @@ void updateLimitSwitches()
 
 void controlWaterPump()
 {
+  /*
   if(waterDeploy)
   {
     if(waterMotorStartTime == 0)
@@ -363,6 +372,15 @@ void controlWaterPump()
   {
     waterMotor.stopMotorWithCoast();
   }
+  */
+  if(waterDeploy && !isTimeUp(waterMotorStartTime, kWaterTimeoutMs))
+  {
+    waterMotor.moveMotorBackward(kWaterDutyCycle);
+  }
+  else
+  {
+    waterMotor.stopMotorWithCoast();
+  }
 }
 
 // dave shutdown function
@@ -375,12 +393,6 @@ void shutdownDave(){
 
     finishSoilLogging();
     landedFinalized  = true;
-}
-
-// timer management helper function
-bool isTimeUp(uint32_t startTime, uint32_t threshhold)
-{
-  return (millis() - startTime) > threshhold;
 }
 
 /*-------------------------------SETUP---------------------------------------------*/
@@ -526,8 +538,8 @@ void loop()
 
   case (INFLIGHT): 
   {
-    if (inflightTimer < kInflightUpdatePeriodMs){ //only updates every 30 ms
-    
+    if (inflightTimer < kInflightUpdatePeriodMs)
+    { //only updates every 30 ms
       return;
     }
     Serial.println("INFLIGHT");
@@ -545,81 +557,7 @@ void loop()
     //adding data to the flighData buffer to be stored in sd card
     flightData.addFlightData(accel, orient, altitude, dataFile);
 
-    //checking if sensor values are sane
-    const bool altitudeValid = altitudeIsSane(altitude);
-    //const bool accelValid = accelVectorIsSane(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z);
-
-    //getting accel squared if valid, if not set to zero
-    //const float32_t accelSquared = accelValid ? squaredMagnitude(accel.acceleration.x, accel.acceleration.y, accel.acceleration.z) : 0.0f;
-
-    // Do we remove flight altitude stuff for safety????
-    /*
-    //if the current alt is valid and wasnt before, setting both current and past to the current alt, then setting has valid alt to true
-    if (altitudeValid) 
-    {
-      if (!hasValidInflightAltitude) 
-      {
-        //if it valid and has had previuos valid alt, just saving current alt to current
-        previousAltitude  = altitude;
-        currentAltitude  = altitude;
-        hasValidInflightAltitude  = true;
-      }
-      else 
-      {
-        currentAltitude  = altitude;
-      }
-    //threshold of consectuve counts cant be met if alt isnt valid
-    } 
-    else 
-    {
-      landingDetectCount  = 0;
-    }
-
-    //must be in flight for at least 5 seconds, this will be true after 5 seconds of inflight state
-    const bool landingEvalArmed = timeDiffInFlight >= kMinInflightBeforeLandingEvalMs;
-
-    //resetting landing sample to false
-    //bool landingSample = false;
-    bool altLessThanHalfM;
-
-    //if after 5 seconds, there is valid alt and accel, seeing if alt is less than half a meter and accel is less than 4
-    if (landingEvalArmed && altitudeValid && hasValidInflightAltitude) // used to have && accelValid
-    {
-      //will be true if the difference in altitude is less than 0.5 meters (falling slowly)
-        altLessThanHalfM = absScalarF32(currentAltitude  - previousAltitude ) <= kLandingAltitudeDeltaThresholdM;
-
-      //will be true is accel is less than 4
-      //const bool lowAccel = accelSquared <= kLandingAccelThresholdSquared;
-
-      //will be true is accel is less than 4 and delta alt is less than 0.5
-      //landingSample = altLessThanHalfM && lowAccel;
-    }
-
-    //if valid sample, and not yet at threshold, increasing consective samples. If not valid, resetting detection count
-    if (altLessThanHalfM) 
-    {
-      if (landingDetectCount  < kLandingDetectConsecutiveSamples) 
-      {
-        landingDetectCount++;
-      }
-    } 
-    else 
-    {
-      landingDetectCount = 0;
-    }
-
-    const bool landedDetectedFromAlt = landingEvalArmed && landingDetectCount >= kLandingDetectConsecutiveSamples;
-
-    //if after five seconds and the detection count gets to five, save the time landed would have been detected from landed
-    if (landedDetectedFromAlt) 
-    {
-      landedStartTimeAlt = millis();
-      Serial.print("Landed start time from alitmeter (from beginning of program): ");
-      Serial.println(landedDetectedFromAlt);
-    }
-    */
     Serial.println(timeDiffInFlight);
-
 
     //if been in inflight for 3 mintutes finish and close the flight logging, enter landed state, and set topHits to one bc it sits at top intially
     if (isTimeUp(inFlightStartTime, kInflightTimeoutMs)) 
@@ -630,13 +568,7 @@ void loop()
       Serial.println("Switching!");
       return;
     }
-    /*
-    //saving current alt for next loop's last alt
-    if (altitudeValid && hasValidInflightAltitude) 
-    {
-      previousAltitude  = currentAltitude;
-    }
-    */
+
     break;
   }
 
@@ -687,18 +619,19 @@ void loop()
           {
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
+            reverseStartTime = millis();
           }
 
           if(isFirstPlunge)
           {
-            isFirstPlunge = !isFirstPlunge;
+            isFirstPlunge = false;
             plungeStartTime = millis();
           }
 
           if(isTimeUp(plungeStartTime, kPlungePeriod))
           {
             whereInLanded = RETRACT;
-            reverseStartTime = millis();
+            retractStartTime = millis();
           }
 
           if(lowerSwitchPressed)
@@ -755,6 +688,7 @@ void loop()
           {
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
+            reverseStartTime = millis();
           }
 
           if(isTimeUp(idleStartTime, kAugerSpinDurationMs)) // this should be changed to a variable
@@ -775,6 +709,7 @@ void loop()
           {
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
+            reverseStartTime = millis();
           }
 
           if(isTimeUp(retractStartTime, kRetractPeriod))
@@ -794,8 +729,10 @@ void loop()
 
         case(FULL_RETRACT):
         {
-          if (!waterDeploy){
+          if (!waterDeploy)
+          {
             waterDeploy = true;
+            waterMotorStartTime = millis();
           }
           
           augerMotor.moveBackwardPololu(); // maybe this should be the other way?
@@ -805,6 +742,7 @@ void loop()
           {
             prevLandedState = whereInLanded;
             whereInLanded = REVERSE;
+            reverseStartTime = millis();
           }
 
           if(upperSwitchPressed)
@@ -848,11 +786,11 @@ void loop()
     }
     else
     {
+      waterMotor.stopMotorWithCoast();
       leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
       augerMotor.moveForwardPololu();
     }
 
-    // implement this in a bit
   }
 
   default:
@@ -865,113 +803,3 @@ void loop()
   delay(50);
 
 }
-
-
-
-/*
-//if the 15 minutes have passed, just return to the program continues forever
-    if (landedFinalized) 
-    {
-      return;
-    }
-
-    Serial.println("LANDED");
-
-    //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
-    if (millis() - landedStartTime  >= kLandedTimeoutMs) 
-    {
-      Serial.println("landed timeout reached, stopping all motors");
-      augerMotor.stopMosfet();
-      leadScrewMotor.stopMotorWithCoast();
-      waterMotor.stopMotorWithCoast();
-      orientMotor.stopMotorWithCoast();
-
-      finishSoilLogging();
-      landedFinalized  = true;
-      return;
-    }
-
-    startSoilLoggingIfNeeded();
-    checkOrientationStep();
-    getAndLogSoilData();
-
-    //switch logic
-    upperSwitchPressed = (digitalReadFast(kUpperLimitSwitchPin) == HIGH); //true if the upper limit switch is currently pressed
-    lowerSwitchPressed = (digitalReadFast(kLowerLimitSwitchPin) == HIGH); //true if the lower limit switch is currently pressed
-
-    upperStateChange = (upperSwitchPressed && !lastUpperSwitchPressed); //when the switch is pressed but wasnt before
-    lowerStateChange = (lowerSwitchPressed && !lastLowerSwitchPressed);
-
-    lastUpperSwitchPressed = upperSwitchPressed; //making last the current for next loop
-    lastLowerSwitchPressed = lowerSwitchPressed;
-
-    if (isOriented)
-    {
-      switch(whereInLanded)
-      {
-        case(PLUNGE): 
-        {
-          augerMotor.moveMosfet();
-          leadScrewMotor.moveMotorBackward(kLeadScrewDutyCycle);
-
-          if(secondPlunge && ((millis() - waterMotorStartTime)<kWaterTimeoutMs))
-          {
-            waterMotor.moveMotorBackward(kWaterDutyCycle);
-          }
-          else 
-          {
-            waterMotor.stopMotorWithCoast();
-            waterGone = true;
-          }
-
-          if(lowerStateChange)
-          {
-            leadScrewMotor.stopMotorWithCoast();
-            augerMotor.moveMosfet();
-            whereInLanded = IDLE;
-            idleStartTime = millis();
-          }
-
-          break;
-        }
-        case(PAUSE):
-        {
-
-          break;
-        }
-        case(IDLE):
-        {
-          if(millis() - idleStartTime >= 12000)
-          {
-            whereInLanded = RETRACT;
-            leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
-          }
-          break;
-        }
-        case (RETRACT):
-        {
-          if(upperStateChange)
-          {
-            if(!secondPlunge && !waterGone)
-            {
-              secondPlunge = true;
-              waterMotorStartTime = millis();
-            }
-            //resetting all landed state variables after complete cycle
-            enterLandedState();
-            whereInLanded = PLUNGE;            
-          }
-          break;
-        }
-
-        default: 
-        {
-          break;
-        }
-      }
-    }
-
-  //just making sure the state staying in landed
-  state = LANDED;
-*/
-
