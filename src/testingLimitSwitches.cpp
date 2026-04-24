@@ -28,11 +28,11 @@ void loop() {
   //   Serial.println("Upper is low");
   // }
 
-  if (digitalRead(kLowerLimitSwitchPin) == HIGH){
-    Serial.println("Lower is high, hit");
+  if (digitalRead(kUpperLimitSwitchPin) == HIGH){
+    Serial.println("Upper is high, hit");
   }
   else{
-    Serial.println("Lower is low");
+    Serial.println("Upper is low");
   }
 
   delay(200);

@@ -105,6 +105,7 @@ HardwareSerial &modbus = Serial1;
   bool waterDeploy = false;
   bool isFirstPlunge = true;
   bool isBeingDragged = true;
+  bool finalDive = true;
 
   //timers for state change tracking
   elapsedMillis preflightTimer;
@@ -575,7 +576,7 @@ void loop()
     Serial.println("LANDED");
 
     //if the different in start time and the current time is larger than 15 mintutes, stopping all mototes, finishing and saving soil logging, then setting landedFinalized to true to stop all functions
-    if (isTimeUp(landedStartTime, kLandedTimeoutMs)) 
+    if (isTimeUp(inFlightStartTime, kLandedTimeoutMs)) 
     {
       Serial.println("landed timeout reached, stopping all motors");
       state = SHUTDOWN;
@@ -631,7 +632,7 @@ void loop()
             retractStartTime = millis();
           }
 
-          if(lowerStateChange && lastLowerSwitchPressed == LOW)
+          if(lowerSwitchPressed)
           {
             Serial.println("Lower switch pressed");
             leadScrewMotor.stopMotorWithCoast();
@@ -735,7 +736,7 @@ void loop()
            // maybe make this go to reverse and then shutdown?
           }
 
-          if(upperStateChange && lastUpperSwitchPressed == LOW)
+          if(upperSwitchPressed)
           {
             whereInLanded = PLUNGE;
             plungeStartTime = millis();
@@ -802,11 +803,13 @@ void loop()
   case (SHUTDOWN):
   {
     updateLimitSwitches();
+    Serial.println(upperSwitchPressed);
 
-    if(upperStateChange && lastUpperSwitchPressed == LOW)
+    if(upperSwitchPressed)
     {
       leadScrewMotor.stopMotorWithCoast();
       augerMotor.stopPololu();
+      Serial.println("in upper limit switches pressed SHUTDOWN");
       waterMotor.stopMotorWithCoast();
       orientMotor.stopMotorWithCoast();
       delay(50);
@@ -814,10 +817,22 @@ void loop()
     else
     {
       waterMotor.stopMotorWithCoast();
+      Serial.println("in upper limit switches not pressed SHUTDOWN");
       leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
       augerMotor.moveForwardPololu();
     }
-
+    /*
+    if(finalDive)
+    {
+      augerMotor.moveForwardPololu();
+      leadScrewMotor.moveMotorForward(kLeadScrewDutyCycle);
+      delay(10000);
+      augerMotor.moveForwardPololu();
+      leadScrewMotor.moveBackwardPololu();
+      delay(10000);
+      finalDive = false;
+    }
+    */
   }
 
   case(E_SHUTDOWN):
@@ -836,6 +851,6 @@ void loop()
 
   }
 
-  delay(50);
+  delay(75);
 
 }

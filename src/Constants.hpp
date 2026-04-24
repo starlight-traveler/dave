@@ -41,7 +41,7 @@ const  int32_t kWaterMotorSleep = -1;       // Water motor driver nSLEEP pin (no
  const  int32_t ledPin = 13;
 
 // -------------------- Flight Controller Thresholds --------------------
-const float32_t kAccelThresholdSquared = 180.0f;         // Launch accel threshold (m/s^2)^2; 864.36 ~= (29.4 m/s^2)^2.
+const float32_t kAccelThresholdSquared = 160.0f;         // Launch accel threshold (m/s^2)^2; 864.36 ~= (29.4 m/s^2)^2.
 const float32_t kAccelSanityMaxAbsMs2 = 1500.0f;          // Absolute accel sanity bound per axis in m/s^2 (reject NaN/Inf/outliers).
 const uint8_t kLaunchDetectConsecutiveSamples = 2;        // Required consecutive preflight samples above launch threshold.
 const float32_t kLandingAccelThresholdSquared = 4.0f;     // Landing low-accel threshold (m/s^2)^2; 4.0 = (2 m/s^2)^2.
@@ -57,12 +57,12 @@ const float32_t kDraggedAccelThresholdSquared = 4.0f;
  const uint32_t kPreflightTimeoutMs = 21600000;            // Max time to stay in preflight before failover to landed (ms, 6 hours).
  const  uint32_t kInflightTimeoutMs = 15000;               // Hard inflight timeout to force landed transition (ms, 3 minutes).
  const uint32_t kMinInflightBeforeLandingEvalMs = 5000;    // Lockout time before landing checks are allowed (ms, 5 seconds).
- const  uint32_t kLandedTimeoutMs = 120000;                 // Max landed operation duration before stopping motors (ms, 15 minutes).
+ const  uint32_t kLandedTimeoutMs = 60000;                 // Max landed operation duration before stopping motors (ms, 15 minutes).
  const  uint32_t kAugerSpinDurationMs = 12000;              // Extra auger spin hold time after full extension (milliseconds).
  const  uint32_t kOrientationTimeoutMs = 10000;              // Max orientation motor run time before forcing complete (milliseconds).
  const  uint32_t kSwitchPollPeriodMs = 5;                   // Limit switch polling interval (milliseconds).
  const  uint32_t kSensorHealthPollMs = 2000;                // Sensor connectivity/health check interval (milliseconds).
- const  uint32_t kWaterTimeoutMs = 30000;                   // the time water will run before stopping
+ const  uint32_t kWaterTimeoutMs = 90000;                   // the time water will run before stopping
  const uint32_t kRetractPeriod = 1000;                      // how long to retract for (usually 1/2 plunge time)
  const uint32_t kPlungePeriod = 3000;                      // how long to plunge for
  const uint32_t kPlungeTimeToBottomLimit = 40000;           // 40 seconds
