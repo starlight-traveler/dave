@@ -50,7 +50,9 @@ const float32_t kLandingAltitudeDeltaThresholdM = 0.5f;   // Max per-sample alti
 const uint8_t kLandingDetectConsecutiveSamples = 5;      // Required consecutive inflight samples meeting landing criteria.
 const float32_t kAltitudeValidMinM = -500.0f;             // Minimum valid barometric altitude (meters).
 const float32_t kAltitudeValidMaxM = 100000.0f;           // Maximum valid barometric altitude (meters).
+const uint32_t kCyclesUpperLowerNotHit = 4;
 const float32_t kDraggedAccelThresholdSquared = 4.0f;
+
 // -------------------- Flight Controller Timing --------------------
  const uint32_t kPreflightUpdatePeriodMs = 50;             // Preflight state update period (milliseconds).
  const  uint32_t kInflightUpdatePeriodMs = 30;              // Inflight state update period (milliseconds).
@@ -69,6 +71,7 @@ const float32_t kDraggedAccelThresholdSquared = 4.0f;
  const uint32_t kRetractTimeToTopLimit = 25000;              //25 seconds
  const uint32_t kReversePeriod = 3000;                       // period of reversing auger when jammed
  const uint32_t kGroundPeriod = 480000;                      // time to wait on ground until deploy anyways (8min)
+
 // -------------------- Motion Tuning --------------------
  const float32_t kLeadScrewDutyCycle = 1.0f;               // Lead screw motor PWM duty cycle (0.0 to 1.0).
  const  float32_t kWaterDutyCycle = 1.0f;                  // Water motor PWM duty cycle (0.0 to 1.0).
